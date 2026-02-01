@@ -1,7 +1,6 @@
 package work.work4.Controller;
 
 import org.springframework.web.bind.annotation.*;
-import work.work4.pojo.Follow;
 import work.work4.pojo.User;
 
 import java.util.List;
