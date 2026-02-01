@@ -19,7 +19,7 @@ public class VideoService implements VideoServiceInterface {
     }
 
     @Override
-    public List<Video> getPopularVideo() {
+    public List<Video> getPopularVideo(Integer pageSize, Integer pageNum) {
         return List.of();
     }
 

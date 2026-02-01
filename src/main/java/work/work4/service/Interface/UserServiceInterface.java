@@ -7,5 +7,5 @@ public interface UserServiceInterface {
     public void register(User user);
     public void login(User user);
     public User getUser(String userId);
-    public void uploadAvatar(MultipartFile file);
+    public void uploadAvatar();
 }

@@ -8,6 +8,8 @@ import java.util.List;
 public interface VideoServiceInterface {
     public void publish(Video video);
     public List<Video> getVideoList(Integer userId, Integer pageNum, Integer pageSize);
-    public List<Video> getPopularVideo();
+
+    List<Video> getPopularVideo(Integer pageSize, Integer pageNum);
+
     public List<Video> searchVideo(Search search);
 }

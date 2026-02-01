@@ -9,7 +9,7 @@ import work.work4.service.UserService;
 @RequestMapping("/user")
 public class UserController {
     @Resource
-    UserService userService;
+    private UserService userService;
     @PostMapping("/register")
     public Result register(@RequestBody User user) {
         userService.register(user);
@@ -17,16 +17,17 @@ public class UserController {
     }
     @PostMapping("/login")
     public Result login(@RequestBody User user) {
+        userService.login(user);
         return Result.success(user);
     }
     @GetMapping("/info")
     public Result getUserInfo(@RequestParam String id) {
-        User user=new User();
+        User user=userService.getUser(id);
         return Result.success(user);
     }
     @PutMapping("/avatar/upload")
     public Result uploadUserAvatar() {
-        User user=new User();
+        userService.uploadAvatar();
         return Result.success();
     }
 }
