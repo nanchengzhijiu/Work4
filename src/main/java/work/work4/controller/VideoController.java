@@ -3,11 +3,10 @@ package work.work4.controller;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 import work.work4.common.Result;
-import work.work4.pojo.Search;
+import work.work4.entity.Search;
 import work.work4.pojo.Video;
 import work.work4.service.VideoService;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -21,7 +20,7 @@ public class VideoController {
         return Result.success();
     }
     @GetMapping("/list")
-    public Result list(@RequestParam Integer userId,
+    public Result list(@RequestParam Long userId,
                             @RequestParam Integer pageNum,
                             @RequestParam Integer pageSize) {
         List<Video> videoList=videoService.getVideoList(userId,pageNum,pageSize);

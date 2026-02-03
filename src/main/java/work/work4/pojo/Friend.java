@@ -4,10 +4,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 @Data
-@TableName("comment")
-public class Comment {
+@TableName("friends")
+public class Friend {
     private Long id;
     private Long userId;
-    private Long videoId;
-    private String content;
+    private Long friendId;
 }

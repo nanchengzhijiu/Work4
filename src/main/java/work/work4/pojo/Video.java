@@ -1,14 +1,15 @@
 package work.work4.pojo;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Data
+@TableName("video")
 public class Video {
-    private Integer id;
-    private Integer userId;
+    private Long id;
+    private Long userId;
     private String title;
     private String videoUrl;
     private String coverUrl;

@@ -2,12 +2,13 @@ package work.work4.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 @Data
-@TableName("comment")
-public class Comment {
+@Accessors(chain = true)
+@TableName("follow")
+public class Follow {
     private Long id;
     private Long userId;
-    private Long videoId;
-    private String content;
+    private Long followId;
 }

@@ -1,14 +1,17 @@
 package work.work4.service;
 
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
+import work.work4.mapper.UserMapper;
 import work.work4.service.Interface.UserServiceInterface;
 import work.work4.pojo.User;
 @Service
 public class UserService implements UserServiceInterface {
+    @Resource
+    private UserMapper userMapper;
     @Override
     public void register(User user) {
-
+        userMapper.insert(user);
     }
 
     @Override
@@ -17,8 +20,8 @@ public class UserService implements UserServiceInterface {
     }
 
     @Override
-    public User getUser(String userId) {
-        return null;
+    public User getUser(Long userId) {
+        return userMapper.selectById(userId);
     }
 
     @Override
