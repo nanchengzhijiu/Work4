@@ -1,9 +1,12 @@
 package work.work4.controller;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.Result;
 import work.work4.pojo.User;
 import work.work4.service.UserService;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/user")
@@ -26,8 +29,8 @@ public class UserController {
         return Result.success(user);
     }
     @PutMapping("/avatar/upload")
-    public Result uploadUserAvatar() {
-        userService.uploadAvatar();
+    public Result uploadUserAvatar(MultipartFile file) throws IOException {
+        userService.uploadAvatar(file);
         return Result.success();
     }
 }
