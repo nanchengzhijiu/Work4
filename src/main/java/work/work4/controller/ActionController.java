@@ -13,6 +13,10 @@ import java.util.List;
 public class ActionController {
     @Resource
     private ActionService actionService;
+    @GetMapping("/test")
+    public String testS(){
+        return "HelloWorld";
+    }
 //    点赞
     @PostMapping("/like/action")
     public Result action(@RequestBody Like like,@RequestParam String actionType) {
