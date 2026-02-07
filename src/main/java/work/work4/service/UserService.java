@@ -7,7 +7,6 @@ import org.springframework.web.multipart.MultipartFile;
 import work.work4.mapper.UserMapper;
 import work.work4.service.Interface.UserServiceInterface;
 import work.work4.pojo.User;
-import work.work4.util.JwtUtils;
 
 import java.io.File;
 import java.io.IOException;
