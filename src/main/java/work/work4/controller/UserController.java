@@ -15,11 +15,11 @@ public class UserController {
         userService.register(user);
         return Result.success();
     }
-    @PostMapping("/login")
-    public Result login(@RequestBody User user) {
-        userService.login(user);
-        return Result.success(user);
-    }
+//    @PostMapping("/login")
+//    public Result login(@RequestBody User user) {
+//        userService.login(user);
+//        return Result.success();
+//    }
     @GetMapping("/info")
     public Result getUserInfo(@RequestParam Long id) {
         User user=userService.getUser(id);

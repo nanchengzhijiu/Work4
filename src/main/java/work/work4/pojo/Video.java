@@ -1,9 +1,11 @@
 package work.work4.pojo;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 @Data
 @TableName("video")
@@ -13,13 +15,14 @@ public class Video {
     private String title;
     private String videoUrl;
     private String coverUrl;
-    private String data;
-    private LocalTime latestTime;
+    private byte[] data;
+    private LocalDateTime latestTime;
     private String description;
     private Integer visitCount;
     private Integer likeCount;
     private Integer commentCount;
-    private LocalTime createdAt;
-    private LocalTime updatedAt;
-    private LocalTime deletedAt;
+    @TableField(fill= FieldFill.INSERT)
+    private LocalDateTime createdAt;
+    @TableField(fill= FieldFill.UPDATE)
+    private LocalDateTime updatedAt;
 }
