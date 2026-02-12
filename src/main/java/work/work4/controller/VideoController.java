@@ -3,10 +3,12 @@ package work.work4.controller;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 import work.work4.common.Result;
-import work.work4.entity.Search;
+import work.work4.dto.SearchDto;
+import work.work4.dto.VideoUploadDto;
 import work.work4.pojo.Video;
 import work.work4.service.VideoService;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -15,8 +17,8 @@ public class VideoController {
     @Resource
     private VideoService videoService;
     @PostMapping("/publish")
-    public Result publish(@RequestBody Video video) {
-        videoService.publish(video);
+    public Result publish(@RequestBody VideoUploadDto videoDto) throws IOException {
+        videoService.publish(videoDto);
         return Result.success();
     }
     @GetMapping("/list")
@@ -27,8 +29,8 @@ public class VideoController {
         return Result.success(videoList);
     }
     @PostMapping("/search")
-    public Result search(@RequestBody Search search) {
-        List<Video> videoList=videoService.searchVideo(search);
+    public Result search(@RequestBody SearchDto searchDto) {
+        List<Video> videoList=videoService.searchVideo(searchDto);
         return Result.success(videoList);
     }
     @GetMapping("/popular")

@@ -4,6 +4,7 @@ import jakarta.annotation.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import work.work4.dto.UserDto;
 import work.work4.mapper.UserMapper;
 import work.work4.service.Interface.UserServiceInterface;
 import work.work4.pojo.User;
@@ -25,14 +26,15 @@ public class UserService implements UserServiceInterface {
     @Resource
     private PasswordEncoder passwordEncoder;
     @Override
-    public void register(User user) {
+    public void register(UserDto userDto) {
 //        加密注册
-        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        String encodedPassword = passwordEncoder.encode(userDto.getPassword());
+        User user = new User();
+        user.setUsername(userDto.getUsername());
         user.setPassword(encodedPassword);
         user.setRole("USER");
         userMapper.insert(user);
     }
-
 //    @Override
 //    public void login(User user) {
 //        //security不处理了

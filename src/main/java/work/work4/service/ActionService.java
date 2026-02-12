@@ -3,6 +3,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import work.work4.dto.CommentDto;
+import work.work4.dto.LikeDto;
 import work.work4.mapper.CommentMapper;
 import work.work4.mapper.LikeMapper;
 import work.work4.mapper.VideoMapper;
@@ -21,12 +23,13 @@ public class ActionService implements ActionServiceInterface {
     @Resource
     private VideoMapper videoMapper;
     @Override
-    public void likeAction(Like like,String actionType) {
+    public void likeAction(LikeDto likeDto) {
+        Like like = new Like().setCommentId(likeDto.getCommentId()).setVideoId(likeDto.getVideoId());
         QueryWrapper<Like> wrapper = new QueryWrapper<>();
-        wrapper.eq(like.getVideoId() != null, "video_id", like.getVideoId())
-                .eq(like.getCommentId() != null, "comment_id", like.getCommentId());
+        wrapper.eq(like.getVideoId() != 0, "video_id", like.getVideoId())
+                .eq(like.getCommentId() != 0, "comment_id", like.getCommentId());
         // 更新点赞数
-        if ("1".equals(actionType)) {
+        if (likeDto.getActionType()==1) {
             like.setTotal(like.getTotal() + 1);
         } else if (like.getTotal() > 0) {
             like.setTotal(like.getTotal() - 1);
@@ -52,20 +55,29 @@ public class ActionService implements ActionServiceInterface {
     }
 
     @Override
-    public void comment(Comment comment) {
+    public void comment(CommentDto commentDto) {
+        Comment comment = new Comment();
+        if (commentDto.getCommentId() != 0) {
+            comment.setCommentId(commentDto.getCommentId());
+        }
+        if (commentDto.getVideoId() != 0) {
+            comment.setVideoId(commentDto.getVideoId());
+        }
+        comment.setContent(commentDto.getCotent());
         commentMapper.insert(comment);
     }
 
     @Override
-    public List<Comment> getCommentList(Long videoId,Integer pageSize,Integer pageNum) {
+    public List<Comment> getCommentList(Long videoId,Long commentId,Integer pageSize,Integer pageNum) {
         Page<Comment> page = new Page<>(pageNum, pageSize);
         QueryWrapper<Comment> wrapper = new QueryWrapper<>();
-        wrapper.eq("video_id", videoId);
+        wrapper.eq(videoId!=0,"video_id", videoId)
+                .eq(commentId!=0, "comment_id", commentId);
         return commentMapper.selectPage(page, wrapper).getRecords();
     }
 
     @Override
-    public void deleteComment(Comment comment) {
-        commentMapper.deleteById(comment.getId());
+    public void deleteComment(CommentDto commentDto) {
+        commentMapper.deleteById(commentDto.getCommentId());
     }
 }

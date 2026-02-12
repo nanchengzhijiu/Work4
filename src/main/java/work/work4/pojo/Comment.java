@@ -13,6 +13,7 @@ public class Comment {
     private Long id;
     private Long userId;
     private Long videoId;
+    private Long commentId;
     private String content;
     @TableField(fill= FieldFill.INSERT)
     private LocalDateTime createdAt;

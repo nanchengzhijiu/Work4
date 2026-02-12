@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import work.work4.dto.FollowDto;
 import work.work4.mapper.FollowMapper;
 import work.work4.mapper.FriendMapper;
 import work.work4.pojo.*;
@@ -17,11 +18,25 @@ public class SocialService implements SocialServiceInterface {
     @Resource
     private FriendMapper friendMapper;
     @Override
-    public void followAction(Long userId,Long followId,String actionType) {
-        Follow follow = new Follow().setUserId(userId).setFollowId(followId);
-        followMapper.insert(follow);
+    public void followAction(FollowDto followDto) {
+        Follow follow = new Follow().setUserId(followDto.getUserId()).setFollowId(followDto.getFollowId());
+        QueryWrapper<Follow> wrapper = new QueryWrapper<>();
+        wrapper.eq("follow_id", followDto.getFollowId())
+                .eq("user_id", followDto.getUserId());
+        if(followDto.getActionType()==0){
+            followMapper.delete(wrapper);
+        }else {
+            followMapper.insert(follow);
+            //        判断对方是否关注自己
+            QueryWrapper<Follow> wrapper1 = new QueryWrapper<>();
+            wrapper1.eq("user_id", followDto.getFollowId())
+                    .eq("follow_id", followDto.getUserId());
+            if(followMapper.selectCount(wrapper1) > 0){
+                Friend friend = new Friend().setUserId(followDto.getUserId()).setFriendId(followDto.getFollowId());
+                friendMapper.insert(friend);
+            }
+        }
     }
-
     @Override
     public List<Follow> getFollowList(Long userId,
                                     Integer pageNum,

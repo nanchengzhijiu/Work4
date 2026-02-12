@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +16,6 @@ public class Video {
     private String title;
     private String videoUrl;
     private String coverUrl;
-    private byte[] data;
     private LocalDateTime latestTime;
     private String description;
     private Integer visitCount;

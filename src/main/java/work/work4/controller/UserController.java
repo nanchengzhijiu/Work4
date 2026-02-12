@@ -3,6 +3,7 @@ import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.Result;
+import work.work4.dto.UserDto;
 import work.work4.pojo.User;
 import work.work4.service.UserService;
 
@@ -14,8 +15,8 @@ public class UserController {
     @Resource
     private UserService userService;
     @PostMapping("/register")
-    public Result register(@RequestBody User user) {
-        userService.register(user);
+    public Result register(@RequestBody UserDto userDto) {
+        userService.register(userDto);
         return Result.success();
     }
 //    @PostMapping("/login")

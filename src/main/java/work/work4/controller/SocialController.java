@@ -3,6 +3,7 @@ package work.work4.controller;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 import work.work4.common.Result;
+import work.work4.dto.FollowDto;
 import work.work4.pojo.Follow;
 import work.work4.pojo.Friend;
 import work.work4.service.SocialService;
@@ -14,8 +15,8 @@ public class SocialController {
     private SocialService socialService;
 //    关注
     @PostMapping("/following/action")
-    public Result followAction(@RequestParam Long userId,@RequestParam Long followId,@RequestParam String actionType) {
-        socialService.followAction(userId,followId,actionType);
+    public Result followAction(@RequestBody FollowDto followDto) {
+        socialService.followAction(followDto);
         return Result.success();
     }
     @GetMapping("/following/list")
