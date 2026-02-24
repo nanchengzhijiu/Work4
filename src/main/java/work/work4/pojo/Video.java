@@ -4,11 +4,12 @@ import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.springframework.web.multipart.MultipartFile;
+import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
 
 @Data
+@Accessors(chain = true)
 @TableName("video")
 public class Video {
     private Long id;
@@ -16,7 +17,7 @@ public class Video {
     private String title;
     private String videoUrl;
     private String coverUrl;
-    private LocalDateTime latestTime;
+    private long during;
     private String description;
     private Integer visitCount;
     private Integer likeCount;
@@ -25,4 +26,6 @@ public class Video {
     private LocalDateTime createdAt;
     @TableField(fill= FieldFill.UPDATE)
     private LocalDateTime updatedAt;
+    private String type;
+    private String year;
 }

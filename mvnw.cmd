@@ -159,7 +159,7 @@ if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $e
   $actualDistributionDir = $distributionUrlNameMain
 }
 
-# If not found, search for any directory with the Maven executable (for snapshots)
+# If not found, searchDto for any directory with the Maven executable (for snapshots)
 if (!$actualDistributionDir) {
   Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
     $testPath = Join-Path $_.FullName "bin/$MVN_CMD"

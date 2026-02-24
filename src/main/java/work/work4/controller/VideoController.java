@@ -17,7 +17,7 @@ public class VideoController {
     @Resource
     private VideoService videoService;
     @PostMapping("/publish")
-    public Result publish(@RequestBody VideoUploadDto videoDto) throws IOException {
+    public Result publish(VideoUploadDto videoDto) throws IOException {
         videoService.publish(videoDto);
         return Result.success();
     }

@@ -6,7 +6,6 @@ import work.work4.common.Result;
 import work.work4.dto.CommentDto;
 import work.work4.dto.LikeDto;
 import work.work4.pojo.Comment;
-import work.work4.pojo.Like;
 import work.work4.pojo.Video;
 import work.work4.service.ActionService;
 import java.util.List;
@@ -16,7 +15,7 @@ public class ActionController {
     @Resource
     private ActionService actionService;
     @GetMapping("/test")
-    public String testS(){
+    public String test(){
         return "HelloWorld";
     }
 //    点赞
