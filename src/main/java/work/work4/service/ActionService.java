@@ -31,17 +31,26 @@ public class ActionService implements ActionServiceInterface {
     private static final String COMMENT_LIKE_COUNT_KEY = "comment:like:count:";
     @Override
     public void likeAction(LikeDto likeDto) {
+        String countKey;
+        if (likeDto.getCommentId()== null && likeDto.getVideoId() == null) {
+            return;
+        }
         Like like = new Like().setCommentId(likeDto.getCommentId()).setVideoId(likeDto.getVideoId());
         QueryWrapper<Like> wrapper = new QueryWrapper<>();
-        wrapper.eq(like.getVideoId() != 0, "video_id", like.getVideoId())
-                .eq(like.getCommentId() != 0, "comment_id", like.getCommentId());
+        wrapper.eq(like.getVideoId() != null, "video_id", like.getVideoId())
+                .eq(like.getCommentId() != null, "comment_id", like.getCommentId());
         // 更新点赞数
         if (likeDto.getActionType()==1) {
             like.setTotal(like.getTotal() + 1);
         } else if (like.getTotal() > 0) {
             like.setTotal(like.getTotal() - 1);
         }
-        String countKey=VIDEO_LIKE_COUNT_KEY+like.getVideoId();
+        if(likeDto.getVideoId()!=null){
+            countKey=VIDEO_LIKE_COUNT_KEY+like.getVideoId();
+        }else{
+            countKey=COMMENT_LIKE_COUNT_KEY+like.getCommentId();
+        }
+
         // 如果Redis中已存在该key，进行增减操作
         if (Boolean.TRUE.equals(template.hasKey(countKey))) {
             if (likeDto.getActionType()==1) {
@@ -50,8 +59,9 @@ public class ActionService implements ActionServiceInterface {
                 template.opsForValue().decrement(countKey);
             }
         } else {
+            Video video;
             // Redis中没有，从MySQL查询后设置
-            Video video = videoMapper.selectById(likeDto.getVideoId());
+            video=likeDto.getVideoId()!=null?videoMapper.selectById(likeDto.getVideoId()):videoMapper.selectById(likeDto.getCommentId());
             if (video != null) {
                template.opsForValue().set(countKey, video.getLikeCount().toString(), 1, TimeUnit.DAYS);
             }
@@ -61,7 +71,7 @@ public class ActionService implements ActionServiceInterface {
     }
 
     @Override
-    public List<Video> getLikeList(Long userId,Integer pageSize,Integer pageNum) {
+    public List<Video> getLikeList(String userId,Integer pageSize,Integer pageNum) {
         // 分页设置
         Page<Video> page = new Page<>(pageNum, pageSize);
 
@@ -78,11 +88,13 @@ public class ActionService implements ActionServiceInterface {
 
     @Override
     public void comment(CommentDto commentDto) {
-        Comment comment = new Comment();
-        if (commentDto.getCommentId() != 0) {
-            comment.setCommentId(commentDto.getCommentId());
+        if(commentDto.getCommentId()==null && commentDto.getVideoId()==null){
+            return;
         }
-        if (commentDto.getVideoId() != 0) {
+        Comment comment = new Comment();
+        if (commentDto.getCommentId() != null) {
+            comment.setCommentId(commentDto.getCommentId());
+        }else{
             comment.setVideoId(commentDto.getVideoId());
         }
         comment.setContent(commentDto.getCotent());
@@ -90,11 +102,11 @@ public class ActionService implements ActionServiceInterface {
     }
 
     @Override
-    public List<Comment> getCommentList(Long videoId,Long commentId,Integer pageSize,Integer pageNum) {
+    public List<Comment> getCommentList(String videoId,String commentId,Integer pageSize,Integer pageNum) {
         Page<Comment> page = new Page<>(pageNum, pageSize);
         QueryWrapper<Comment> wrapper = new QueryWrapper<>();
-        wrapper.eq(videoId!=0,"video_id", videoId)
-                .eq(commentId!=0, "comment_id", commentId);
+        wrapper.eq(videoId!=null,"video_id", videoId)
+                .eq(commentId!=null, "comment_id", commentId);
         return commentMapper.selectPage(page, wrapper).getRecords();
     }
 

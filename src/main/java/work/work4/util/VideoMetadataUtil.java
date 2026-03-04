@@ -14,13 +14,13 @@ public class VideoMetadataUtil {
      * @param coverSavePath 封面图存储的绝对路径 (例如: /opt/cover/test.jpg)
      * @return 视频时长（秒），如果处理失败则返回 0
      */
-    public static long processVideo(String videoPath, String coverSavePath) {
+    public static Long processVideo(String videoPath, String coverSavePath) {
         // 使用 try-with-resources 自动关闭 grabber 资源
         try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(videoPath)) {
             grabber.start();
 
             // 1. 获取时长 (微秒 -> 秒)
-            long duration = grabber.getLengthInTime() / 1000000;
+            Long duration = grabber.getLengthInTime() / 1000000;
 
             // 2. 截取第一帧
             Frame frame = null;
@@ -45,7 +45,7 @@ public class VideoMetadataUtil {
 
         } catch (Exception e) {
             System.out.println("视频处理工具类解析失败，路径: {}，错误: {}"+videoPath+e.getMessage());
-            return 0;
+            return null;
         }
     }
 

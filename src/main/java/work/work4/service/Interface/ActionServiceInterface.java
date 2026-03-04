@@ -9,8 +9,8 @@ import java.util.List;
 
 public interface ActionServiceInterface {
     void likeAction(LikeDto likeDto);
-    List<Video>  getLikeList(Long userId,Integer pageSize,Integer pageNum);
+    List<Video>  getLikeList(String userId,Integer pageSize,Integer pageNum);
     void comment(CommentDto commentDto);
-    List<Comment> getCommentList(Long videoId,Long commentId,Integer pageSize,Integer pageNum);
+    List<Comment> getCommentList(String videoId,String commentId,Integer pageSize,Integer pageNum);
     void deleteComment(CommentDto commentDto);
 }

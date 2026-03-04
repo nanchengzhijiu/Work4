@@ -12,11 +12,11 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 @TableName("like")
 public class Like {
-    private Long id;
-    private Long videoId;
+    private String id;
+    private String videoId;
     private Integer total;
-    private Long commentId;
-    private Long userId;
+    private String commentId;
+    private String userId;
     @TableField(fill= FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

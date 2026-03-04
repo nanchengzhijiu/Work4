@@ -79,7 +79,7 @@ public class VideoService implements VideoServiceInterface {
             Files.copy(inputStream, videoPath, StandardCopyOption.REPLACE_EXISTING);
         }
         // 4. 自动识别时长与截取第一帧封面
-        long duration = VideoMetadataUtil.processVideo(
+        Long duration = VideoMetadataUtil.processVideo(
                 videoPath.toAbsolutePath().toString(), // 传入视频的绝对路径
                 coverPath.toAbsolutePath().toString()       // 传入封面图的绝对路径
         );
@@ -96,7 +96,7 @@ public class VideoService implements VideoServiceInterface {
         videoMapper.insert(video);
     }
     @Override
-    public List<Video> getVideoList(Long userId, Integer pageNum, Integer pageSize) {
+    public List<Video> getVideoList(String userId, Integer pageNum, Integer pageSize) {
         Page<Video> page = new Page<>(pageNum, pageSize);
         QueryWrapper<Video> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId);
@@ -119,14 +119,13 @@ public class VideoService implements VideoServiceInterface {
             for (Video video : topVideos) {
                 // 使用视频ID作为member，点击率作为score
                 ZSetOperations.TypedTuple<Object> tuple =
-                        new DefaultTypedTuple<>(video.getId().toString(), video.getVisitCount().doubleValue());
+                        new DefaultTypedTuple<>(video.getId(), video.getVisitCount().doubleValue());
                 tuples.add(tuple);
             }
             redisTemplate.opsForZSet().add(VIDEO_VISIT_RANKING, tuples);
             // 设置过期时间（7天）
             redisTemplate.expire(VIDEO_VISIT_RANKING, 7, TimeUnit.DAYS);
         }
-        System.out.println("点击率排行榜刷新完成，共 " + topVideos.size() + " 个视频");
     }
     @Override
     public List<Video> getPopularVideo(Integer pageSize, Integer pageNum) {
@@ -142,7 +141,6 @@ public class VideoService implements VideoServiceInterface {
         });
         return topVideoList;
     }
-
     @Override
     public List<Video> searchVideo(SearchDto searchDto) {
         Page<Video> page = new Page<>(searchDto.getPageNum(), searchDto.getPageSize());

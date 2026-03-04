@@ -30,3 +30,12 @@ mybatis-plus:
     db-config:
       id-type: assign_id
   type-aliases-package: work.work4.pojo
+# 阿里云OSS配置
+aliyun:
+  oss:
+    endpoint: "http://oss-cn-hangzhou.aliyuncs.com"
+    access-key-id: "LTAI5tGRCQxcwzr2SkHJrgT9"
+    access-key-secret: "YnPX3irDTLmTGzgMuGmt3WtokLHHum"
+    bucket-name: work4-avatar # 你的OSS存储空间名称
+    # 可以设置文件访问URL的前缀，例如: https://your-bucket-name.oss-cn-hangzhou.aliyuncs.com/
+    base-url: https://${aliyun.oss.bucket-name}.${aliyun.oss.endpoint}/

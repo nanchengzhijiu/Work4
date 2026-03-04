@@ -2,10 +2,9 @@ package work.work4.controller;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import work.work4.common.Result;
-import work.work4.dto.UserDto;
-import work.work4.pojo.User;
+import work.work4.common.RestBean;
 import work.work4.service.UserService;
+import work.work4.vo.UserVo;
 
 import java.io.IOException;
 
@@ -15,23 +14,21 @@ public class UserController {
     @Resource
     private UserService userService;
     @PostMapping("/register")
-    public Result register(@RequestBody UserDto userDto) {
-        userService.register(userDto);
-        return Result.success();
+    public RestBean<Object> register(@RequestParam String username, @RequestParam String password) {
+        userService.register(username, password);
+        return RestBean.success();
     }
-//    @PostMapping("/login")
-//    public Result login(@RequestBody User user) {
-//        userService.login(user);
-//        return Result.success();
-//    }
+    @PostMapping("/login")
+    public RestBean<Object> login(@RequestParam String username, @RequestParam String password) {
+        return RestBean.success(userService.login(username,password));
+    }
     @GetMapping("/info")
-    public Result getUserInfo(@RequestParam Long id) {
-        User user=userService.getUser(id);
-        return Result.success(user);
+    public RestBean<Object> getUserInfo(@RequestParam String user_id) {
+        UserVo uservo=userService.getUser(user_id);
+        return RestBean.success(uservo);
     }
     @PutMapping("/avatar/upload")
-    public Result uploadUserAvatar(MultipartFile file) throws IOException {
-        userService.uploadAvatar(file);
-        return Result.success();
+    public RestBean<Object> uploadUserAvatar(@RequestParam MultipartFile data) throws IOException {
+        return RestBean.success(userService.uploadAvatar(data));
     }
 }

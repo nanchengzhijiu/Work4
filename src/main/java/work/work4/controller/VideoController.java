@@ -22,7 +22,7 @@ public class VideoController {
         return Result.success();
     }
     @GetMapping("/list")
-    public Result list(@RequestParam Long userId,
+    public Result list(@RequestParam String userId,
                             @RequestParam Integer pageNum,
                             @RequestParam Integer pageSize) {
         List<Video> videoList=videoService.getVideoList(userId,pageNum,pageSize);

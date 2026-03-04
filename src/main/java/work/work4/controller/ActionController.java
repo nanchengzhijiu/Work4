@@ -25,7 +25,7 @@ public class ActionController {
         return Result.success();
     }
     @GetMapping("like/list")
-    public Result list(@RequestParam Long userId,
+    public Result list(@RequestParam String userId,
                             @RequestParam Integer pageSize,
                             @RequestParam Integer pageNum) {
         List<Video> videoList=actionService.getLikeList(userId,pageSize,pageNum);
@@ -38,8 +38,8 @@ public class ActionController {
         return Result.success();
     }
     @GetMapping("/comment/list")
-    public Result listComment(@RequestParam Long videoId,
-                                     @RequestParam Long commentId,
+    public Result listComment(@RequestParam String videoId,
+                                     @RequestParam String commentId,
                                      @RequestParam Integer pageSize,
                                      @RequestParam Integer pageNum) {
         List<Comment> commentList=actionService.getCommentList(videoId,commentId,pageSize,pageNum);

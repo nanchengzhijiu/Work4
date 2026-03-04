@@ -10,10 +10,10 @@ import java.time.LocalDateTime;
 @Data
 @TableName("comment")
 public class Comment {
-    private Long id;
-    private Long userId;
-    private Long videoId;
-    private Long commentId;
+    private String id;
+    private String userId;
+    private String videoId;
+    private String commentId;
     private String content;
     @TableField(fill= FieldFill.INSERT)
     private LocalDateTime createdAt;

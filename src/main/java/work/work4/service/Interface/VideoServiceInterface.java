@@ -11,7 +11,7 @@ import java.util.List;
 public interface VideoServiceInterface {
     @Async("videoPublishExecutor")
     void publish(VideoUploadDto videoDto) throws IOException;
-    List<Video> getVideoList(Long userId, Integer pageNum, Integer pageSize);
+    List<Video> getVideoList(String userId, Integer pageNum, Integer pageSize);
 
     List<Video> getPopularVideo(Integer pageSize, Integer pageNum);
 

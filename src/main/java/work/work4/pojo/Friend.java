@@ -8,7 +8,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @TableName("friends")
 public class Friend {
-    private Long id;
-    private Long userId;
-    private Long friendId;
+    private String id;
+    private String userId;
+    private String friendId;
 }

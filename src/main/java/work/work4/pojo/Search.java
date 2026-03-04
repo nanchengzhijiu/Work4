@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 @TableName("search")
 public class Search {
-    private Long id;
+    private String id;
     private String keyword;
     private LocalDateTime publishTime;
     private String type;

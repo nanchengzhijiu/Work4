@@ -1,25 +1,39 @@
 package work.work4.common;
 
-import com.alibaba.fastjson2.JSONObject;
-import com.alibaba.fastjson2.JSONWriter;
+import lombok.Data;
 
-public record RestBean<T> (int code, T data, String message) {
-    //写几个工具方法，用于快速创建RestBean对象
-    public static <T> RestBean<T> success(T data){
-        return new RestBean<>(200, data, "请求成功");
-    }
-    public static <T> RestBean<T> success(){
-        return new RestBean<>(200, null, "请求成功");
-    }
-    public static <T> RestBean<T> failure(int code, String message){
-        return new RestBean<>(code, null, message);
+import java.io.Serializable;
+
+@Data
+public class RestBean<T> implements Serializable {
+    private Base base;
+    private T data; //数据
+
+    public static <T> RestBean<T> success() {
+        RestBean<T> result = new RestBean<>();
+        Base base = new Base();
+        base.setCode(10000);
+        base.setMsg("success");
+        result.setBase(base);
+        return result;
     }
 
-    public static <T> RestBean<T> failure(int code){
-        return failure(code, "请求失败");
+    public static <T> RestBean<T> success(T data) {
+        RestBean<T> bean = new RestBean<>();
+        Base base = new Base();
+        base.setCode(10000);
+        base.setMsg("success");
+        bean.setBase(base);
+        bean.setData(data);
+        return bean;
     }
-    //将当前对象转换为JSON格式的字符串用于返回
-    public String asJsonString() {
-        return JSONObject.toJSONString(this, JSONWriter.Feature.WriteNulls);
+
+    public static <T> RestBean<T> error(String msg) {
+        RestBean<T> result = new RestBean<>();
+        Base base = new Base();
+        base.setCode(-1);
+        base.setMsg(msg);
+        result.setBase(base);
+        return result;
     }
 }

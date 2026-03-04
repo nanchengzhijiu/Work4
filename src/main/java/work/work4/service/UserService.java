@@ -1,68 +1,126 @@
 package work.work4.service;
-
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import work.work4.dto.UserDto;
+import work.work4.common.LoginUser;
 import work.work4.mapper.UserMapper;
-import work.work4.service.Interface.UserServiceInterface;
 import work.work4.pojo.User;
+import work.work4.service.Interface.UserServiceInterface;
+import work.work4.util.FileUtils;
+import work.work4.util.JwtUtils;
+import work.work4.vo.UserVo;
 
-import java.io.File;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 public class UserService implements UserServiceInterface {
     @Resource
     private UserMapper userMapper;
     @Resource
     private PasswordEncoder passwordEncoder;
+    @Resource
+    private AuthenticationManager authenticationManager;
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
+    @Resource
+    private FileUtils fileUtil;
     @Override
-    public void register(UserDto userDto) {
+    public void register(String username, String password) {
 //        加密注册
-        String encodedPassword = passwordEncoder.encode(userDto.getPassword());
+        String encodedPassword = passwordEncoder.encode(password);
         User user = new User();
-        user.setUsername(userDto.getUsername());
+        user.setUsername(username);
         user.setPassword(encodedPassword);
         user.setRole("USER");
         userMapper.insert(user);
     }
-//    @Override
-//    public void login(User user) {
-//        //security不处理了
-//    }
-
     @Override
-    public User getUser(Long userId) {
-        return userMapper.selectById(userId);
+    public UserVo login(String username, String password) {
+        // 1. 创建未认证的令牌
+        UsernamePasswordAuthenticationToken authToken =
+                new UsernamePasswordAuthenticationToken(username, password);
+        Authentication authenticate= authenticationManager.authenticate(authToken);
+        if(Objects.isNull(authenticate)){
+            System.out.println("登录失败");
+        }
+//        认证成功
+        LoginUser loginUser = (LoginUser) authenticate.getPrincipal();
+        User user=loginUser.getUser();
+        String token = JwtUtils.createJwt(loginUser);
+        UserVo vo = new UserVo();
+        BeanUtils.copyProperties(user, vo);
+        vo.setToken(token);
+        // 4. 存入 Redis 并设置过期时间 (例如 7 天)
+        // 这里的 Key 建议加个前缀，方便管理
+        String redisKey = "login:token:" + token;
+        redisTemplate.opsForValue().set(redisKey, vo, 7, TimeUnit.DAYS);
+        return vo;
     }
 
     @Override
-    public void uploadAvatar(MultipartFile file) throws IOException{
-        String pathName="static/avatar";
-        File directory = new File(pathName);
-        if (!directory.exists()) {
-            boolean created = directory.mkdirs();
-            if (!created) {
-                throw new IOException("无法创建目录: " + directory);
+    public UserVo getUser(String userId) {
+        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            System.out.println("认证失效，请重新登录");
+        }
+        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
+        String currentLoginId =loginUser.getUser().getId();
+
+        // 2. 判断当前登录人是否有权操作这个 userId
+        // 只能查自己的信息
+        if (!currentLoginId.equals(userId)) {
+            System.out.println("用户信息不匹配");
+        }
+
+        // 3.此时 userId 已经被验证是属于当前登录人的
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            System.out.println("用户不存在");
+        }
+
+        // 4. 【包装返回】
+        UserVo vo = new UserVo();
+        BeanUtils.copyProperties(user, vo);
+        vo.setId(user.getId());
+        return vo;
+    }
+
+    @Override
+    public UserVo uploadAvatar(MultipartFile file) throws IOException{
+        try (InputStream is = file.getInputStream()) {
+            // 尝试读取图片，如果不是真正的图片格式，ImageIO 会返回 null
+            BufferedImage bi = ImageIO.read(is);
+            if (bi == null || bi.getWidth() <= 0 || bi.getHeight() <= 0) {
+                throw new RuntimeException("上传文件内容损坏或不是合法的图片");
             }
+        } catch (IOException e) {
+            throw new RuntimeException("图片解析异常");
         }
-        //上传文件名
-        String fileName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss"))+file.getOriginalFilename();
-        // 构建目标文件路径
-        Path targetLocation = Paths.get(pathName).resolve(fileName);
-        // 保存文件
-        try (InputStream inputStream = file.getInputStream()) {
-        //覆盖相同文件
-            Files.copy(inputStream, targetLocation, StandardCopyOption.REPLACE_EXISTING);
+        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            System.out.println("认证失效，请重新登录");
         }
+        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
+        User user = userMapper.selectById(loginUser.getUser().getId());
+        UserVo vo = new UserVo();
+        BeanUtils.copyProperties(user, vo);
+        userMapper.updateById(user.setAvatarUrl(fileUtil.upload(file)));
+        return vo;
     }
 }

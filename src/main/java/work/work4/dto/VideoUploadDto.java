@@ -5,7 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Data
 public class VideoUploadDto {
     private MultipartFile videoFile;
-    private Long userId;
+    private String userId;
     private String title;
     private String description;
     private String type;

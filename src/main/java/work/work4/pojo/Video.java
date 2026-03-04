@@ -12,12 +12,12 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 @TableName("video")
 public class Video {
-    private Long id;
-    private Long userId;
+    private String id;
+    private String userId;
     private String title;
     private String videoUrl;
     private String coverUrl;
-    private long during;
+    private Long during;
     private String description;
     private Integer visitCount;
     private Integer likeCount;
