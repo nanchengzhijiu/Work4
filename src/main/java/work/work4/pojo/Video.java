@@ -17,7 +17,6 @@ public class Video {
     private String title;
     private String videoUrl;
     private String coverUrl;
-    private Long during;
     private String description;
     private Integer visitCount;
     private Integer likeCount;

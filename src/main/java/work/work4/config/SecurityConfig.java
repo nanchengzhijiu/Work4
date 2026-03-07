@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .sessionManagement(conf -> conf.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态
                 .authorizeHttpRequests(conf -> {
                     // 允许登录、注册、静态资源直接访问
-                    conf.requestMatchers("/user/login","/login", "/user/register", "/css/**", "/js/**").permitAll();
+                    conf.requestMatchers("/user/login","/user/register","/video/feed", "/css/**", "/js/**").permitAll();
                     conf.anyRequest().authenticated();
                 })
                 .exceptionHandling(conf -> {

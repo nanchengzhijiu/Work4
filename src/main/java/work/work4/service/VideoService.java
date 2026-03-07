@@ -6,11 +6,16 @@ import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import work.work4.common.LoginUser;
 import work.work4.dto.SearchDto;
 import work.work4.dto.VideoUploadDto;
 import work.work4.mapper.SearchMapper;
@@ -18,7 +23,10 @@ import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Search;
 import work.work4.service.Interface.VideoServiceInterface;
 import work.work4.pojo.Video;
+import work.work4.util.FileUtils;
 import work.work4.util.VideoMetadataUtil;
+import work.work4.vo.VideoVo;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +41,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class VideoService implements VideoServiceInterface {
@@ -40,8 +49,11 @@ public class VideoService implements VideoServiceInterface {
     private VideoMapper videoMapper;
     @Resource
     private SearchMapper searchMapper;
+    @Resource
+    private FileUtils fileUtils;
     // Redis key常量
     private static final String VIDEO_VISIT_RANKING = "video:ranking:visit";// 点击率排行榜
+    private static final String VIDEO_POOL_KEY = "video:global:pool";//随机池
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
     @PostConstruct
@@ -56,51 +68,57 @@ public class VideoService implements VideoServiceInterface {
             throw new IOException("无法创建目录: " + path);
         }
     }
-    @Async("videoPublishExecutor")
+
     @Override
-    public void publish(VideoUploadDto videoDto) throws IOException {
-        // 1. 基础路径配置
-        String baseDir = "static/video/";
-        String coverDir = "static/cover/";
-        ensureDirectoryExists(baseDir);
-        ensureDirectoryExists(coverDir);
+    public List<VideoVo> getVideoStream(String latest_time) {
+        // 1. 从 Redis 随机抽取 20 个视频 ID
+        List<Object> randomIds = redisTemplate.opsForSet().randomMembers(VIDEO_POOL_KEY, 20);
 
-        // 2. 生成唯一文件名 (建议加 UUID 防止并发冲突)
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        String originalName = videoDto.getVideoFile().getOriginalFilename();
-        String videoFileName = timestamp + "_" + originalName;
-        String coverFileName = videoFileName.substring(0, videoFileName.lastIndexOf(".")) + ".jpg";
-
-        Path videoPath = Paths.get(baseDir).resolve(videoFileName);
-        Path coverPath = Paths.get(coverDir).resolve(coverFileName);
-
-        // 3. 保存视频文件到本地
-        try (InputStream inputStream = videoDto.getVideoFile().getInputStream()) {
-            Files.copy(inputStream, videoPath, StandardCopyOption.REPLACE_EXISTING);
+        if (randomIds == null || randomIds.isEmpty()) {
+            // 如果 Redis 为空（初次启动），可以从数据库保底查几条
+            return null;
         }
-        // 4. 自动识别时长与截取第一帧封面
-        Long duration = VideoMetadataUtil.processVideo(
-                videoPath.toAbsolutePath().toString(), // 传入视频的绝对路径
-                coverPath.toAbsolutePath().toString()       // 传入封面图的绝对路径
-        );
-        // 5. 保存到数据库
+        // 2. 根据 ID 批量查询数据库详情
+        List<Video> videos = videoMapper.selectVideosByIdList(randomIds);
+        List<VideoVo> videoVos = videos.stream().map(video -> {
+            VideoVo vo = new VideoVo();
+            BeanUtils.copyProperties(video, vo);
+            return vo;
+        }).toList();
+        return videoVos;
+    }
+
+    @Override
+    public void publish(MultipartFile file,String title,String description,LoginUser loginUser) throws IOException {
+
+        // 2. 调用工具类上传到阿里云 OSS
+        // 数组索引 0 是视频名，1 是带截帧参数的封面名
+        String[] uploadResults = fileUtils.uploadVideo(file);
+        String videoFileName = uploadResults[0];
+        String coverFileName = uploadResults[1];
+
+        // 3. 构建实体并入库
         Video video = new Video()
-                .setTitle(videoDto.getTitle())
-                .setDescription(videoDto.getDescription())
-                .setVideoUrl(videoFileName)         // 建议存生成的唯一文件名
-                .setCoverUrl(coverFileName)         // 新增：封面图路径
-                .setDuring(duration)// 新增：时长
-                .setType(videoDto.getType())
-                .setYear(videoDto.getYear())
-                .setUserId(videoDto.getUserId());
+                .setUserId(loginUser.getUser().getId())
+                .setTitle(title)
+                .setDescription(description)
+                .setVideoUrl(videoFileName)
+                .setCoverUrl(coverFileName);
         videoMapper.insert(video);
+        redisTemplate.opsForSet().add(VIDEO_POOL_KEY, video.getId());
     }
     @Override
-    public List<Video> getVideoList(String userId, Integer pageNum, Integer pageSize) {
+    public List<VideoVo> getVideoList(String userId, Integer pageNum, Integer pageSize) {
         Page<Video> page = new Page<>(pageNum, pageSize);
         QueryWrapper<Video> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId);
-        return videoMapper.selectPage(page,wrapper).getRecords();
+        List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
+        List<VideoVo> videoVos = videos.stream().map(video -> {
+            VideoVo vo = new VideoVo();
+            BeanUtils.copyProperties(video, vo);
+            return vo;
+        }).toList();
+        return videoVos;
     }
     public void refreshVisitRanking() {
         // 1. 查询数据库，按点击率排序，取前1000

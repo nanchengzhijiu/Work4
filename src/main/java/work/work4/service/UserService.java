@@ -76,7 +76,7 @@ public class UserService implements UserServiceInterface {
         // 1.从 SecurityContext 中拿到当前登录者的真实 ID
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null) {
-            System.out.println("认证失效，请重新登录");
+            throw new RuntimeException("用户未登录或认证失效");
         }
         LoginUser loginUser=(LoginUser) authentication.getPrincipal();
         String currentLoginId =loginUser.getUser().getId();
@@ -102,6 +102,11 @@ public class UserService implements UserServiceInterface {
 
     @Override
     public UserVo uploadAvatar(MultipartFile file) throws IOException{
+        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new RuntimeException("用户未登录或认证失效");
+        }
         try (InputStream is = file.getInputStream()) {
             // 尝试读取图片，如果不是真正的图片格式，ImageIO 会返回 null
             BufferedImage bi = ImageIO.read(is);
@@ -111,16 +116,12 @@ public class UserService implements UserServiceInterface {
         } catch (IOException e) {
             throw new RuntimeException("图片解析异常");
         }
-        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            System.out.println("认证失效，请重新登录");
-        }
         LoginUser loginUser=(LoginUser) authentication.getPrincipal();
         User user = userMapper.selectById(loginUser.getUser().getId());
+        user.setAvatarUrl(fileUtil.uploadPicture(file));
+        userMapper.updateById(user);
         UserVo vo = new UserVo();
         BeanUtils.copyProperties(user, vo);
-        userMapper.updateById(user.setAvatarUrl(fileUtil.upload(file)));
         return vo;
     }
 }
