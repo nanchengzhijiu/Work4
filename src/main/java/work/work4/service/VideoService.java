@@ -10,36 +10,20 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
 import work.work4.dto.SearchDto;
-import work.work4.dto.VideoUploadDto;
 import work.work4.mapper.SearchMapper;
 import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Search;
 import work.work4.service.Interface.VideoServiceInterface;
 import work.work4.pojo.Video;
 import work.work4.util.FileUtils;
-import work.work4.util.VideoMetadataUtil;
 import work.work4.vo.VideoVo;
-
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -61,14 +45,6 @@ public class VideoService implements VideoServiceInterface {
         // 加载点击率排行榜
         refreshVisitRanking();
     }
-//    确保目录存在
-    private void ensureDirectoryExists(String path) throws IOException {
-        File directory = new File(path);
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw new IOException("无法创建目录: " + path);
-        }
-    }
-
     @Override
     public List<VideoVo> getVideoStream(String latest_time) {
         // 1. 从 Redis 随机抽取 20 个视频 ID
@@ -100,6 +76,7 @@ public class VideoService implements VideoServiceInterface {
         // 3. 构建实体并入库
         Video video = new Video()
                 .setUserId(loginUser.getUser().getId())
+                .setUsername(loginUser.getUser().getUsername())
                 .setTitle(title)
                 .setDescription(description)
                 .setVideoUrl(videoFileName)
@@ -110,73 +87,86 @@ public class VideoService implements VideoServiceInterface {
     @Override
     public List<VideoVo> getVideoList(String userId, Integer pageNum, Integer pageSize) {
         Page<Video> page = new Page<>(pageNum, pageSize);
-        QueryWrapper<Video> wrapper = new QueryWrapper<>();
-        wrapper.eq("user_id", userId);
+        LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Video::getUserId, userId);
         List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
-        List<VideoVo> videoVos = videos.stream().map(video -> {
+        if (CollectionUtils.isEmpty(videos)) {
+            return Collections.emptyList();
+        }
+        return videos.stream().map(video -> {
             VideoVo vo = new VideoVo();
             BeanUtils.copyProperties(video, vo);
             return vo;
-        }).toList();
-        return videoVos;
+        }).collect(Collectors.toList());
     }
     public void refreshVisitRanking() {
-        // 1. 查询数据库，按点击率排序，取前1000
-        LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
-        wrapper.orderByDesc(Video::getVisitCount)
-                .last("LIMIT 1000");
-
-        List<Video> topVideos = videoMapper.selectList(wrapper);
-
-        // 2. 清空旧的排行榜
-        redisTemplate.delete(VIDEO_VISIT_RANKING);
-
-        // 3. 批量添加到Sorted Set
-        if (!CollectionUtils.isEmpty(topVideos)) {
-            Set<ZSetOperations.TypedTuple<Object>> tuples = new HashSet<>();
-            for (Video video : topVideos) {
-                // 使用视频ID作为member，点击率作为score
-                ZSetOperations.TypedTuple<Object> tuple =
-                        new DefaultTypedTuple<>(video.getId(), video.getVisitCount().doubleValue());
-                tuples.add(tuple);
-            }
-            redisTemplate.opsForZSet().add(VIDEO_VISIT_RANKING, tuples);
-            // 设置过期时间（7天）
-            redisTemplate.expire(VIDEO_VISIT_RANKING, 7, TimeUnit.DAYS);
-        }
-    }
-    @Override
-    public List<Video> getPopularVideo(Integer pageSize, Integer pageNum) {
-//      获取排行版前十
-        Set<Object> topVideos = redisTemplate.opsForZSet()
-                .reverseRange(VIDEO_VISIT_RANKING, (pageNum-1)*pageSize, pageSize);
+        List<Video> topVideos = videoMapper.selectList(new LambdaQueryWrapper<Video>()
+                .select(Video::getId, Video::getVisitCount) //只取必要的列
+                .orderByDesc(Video::getVisitCount)
+                .last("LIMIT 1000"));
         if (CollectionUtils.isEmpty(topVideos)) {
-            refreshVisitRanking();
+            return;
         }
-        ArrayList<Video> topVideoList = new ArrayList<>();
-        topVideos.forEach(video -> {
-            topVideoList.add(videoMapper.selectById(video.toString()));
-        });
-        return topVideoList;
+        // 2. 准备数据：使用 Stream API 快速构建 TypedTuple 集合
+        Set<ZSetOperations.TypedTuple<Object>> tuples = topVideos.stream()
+                .map(v -> new DefaultTypedTuple<>((Object) v.getId(), v.getVisitCount().doubleValue()))
+                .collect(Collectors.toSet());
+        // 3. 使用临时 Key 刷新,防止刷新时正在写入redis
+        String tempKey = VIDEO_VISIT_RANKING + ":temp";
+        // 写入临时 Key 并设置过期时间
+        redisTemplate.opsForZSet().add(tempKey, tuples);
+        redisTemplate.expire(tempKey, 7, TimeUnit.DAYS);
+        // 重命名临时 Key 为正式 Key
+        // 这样在刷新的一瞬间，旧数据直接被覆盖，用户永远不会读到空数据
+        redisTemplate.rename(tempKey, VIDEO_VISIT_RANKING);
     }
     @Override
-    public List<Video> searchVideo(SearchDto searchDto) {
-        Page<Video> page = new Page<>(searchDto.getPageNum(), searchDto.getPageSize());
-        String keyword = searchDto.getKeyword();
-        String type = searchDto.getType();
-        LocalDateTime publishTime = searchDto.getPublishTime();
-        String year = searchDto.getYear();
-        QueryWrapper<Video> wrapper = new QueryWrapper<>();
-        wrapper.eq("title", keyword)
-                .eq("type", type)
-                .eq("publish_time", publishTime)
-                .eq("year", year);
-        Search search = new Search()
-                        .setKeyword(keyword)
-                        .setType(type)
-                        .setPublishTime(publishTime)
-                        .setYear(year);
+    public List<VideoVo> getPopularVideo(Integer pageSize, Integer pageNum) {
+        //获取排行版
+        int start=(pageNum-1)*pageSize;
+        int end = start + pageSize - 1;
+        //  从 ZSet 获取视频 ID 列表
+        Set<Object> idSet = redisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
+        //  缓存缺失处理
+        if (CollectionUtils.isEmpty(idSet)) {
+            // 建议：此处可以引入分布式锁，防止并发刷库
+            refreshVisitRanking();
+            // 刷新后重新获取一次
+            idSet = redisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
+            if (CollectionUtils.isEmpty(idSet)) return Collections.emptyList();
+        }
+        List<Object> videoIds = idSet.stream().map(Object::toString).collect(Collectors.toList());
+        // 关键优化：使用 IN 查询，一次性查出所有数据 (批量查询)
+        List<Video> videos = videoMapper.selectVideosByIdList(videoIds);
+
+        // 内存排序：selectBatchIds 不保证顺序，需按照 videoIds 的顺序重排
+        //先放入map中
+        Map<String, VideoVo> videoMap = videos.stream().map((video)->{
+                    VideoVo vo = new VideoVo();
+                    BeanUtils.copyProperties(video, vo);
+                    return vo;
+                })
+                .collect(Collectors.toMap(VideoVo::getId, v -> v));
+        //再通过videoIds流按顺序整理
+        return videoIds.stream()
+                .map(videoMap::get)
+                .filter(Objects::nonNull) // 过滤掉数据库里可能不存在的视频
+                .collect(Collectors.toList());
+    }
+    @Override
+    public List<VideoVo> searchVideo(String keywords,Integer pageSize,Integer pageNum,String username) {
+        Page<Video> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Video::getTitle, keywords)
+                .eq(Video::getUsername, username);
+        Search search = new Search().setKeyword(keywords);
         searchMapper.insert(search);
-        return videoMapper.selectPage(page,wrapper).getRecords();
+        List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
+        List<VideoVo> videoVos=videos.stream().map((v)->{
+            VideoVo vo = new VideoVo();
+            BeanUtils.copyProperties(v, vo);
+            return vo;
+        }).collect(Collectors.toList());
+        return videoVos;
     }
 }

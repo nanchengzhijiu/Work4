@@ -34,6 +34,7 @@ public class VideoController {
             throw new RuntimeException("用户未登录或认证失效");
         }
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        System.out.println(loginUser);
         videoService.publish(data,title,description,loginUser);
         return RestBean.success();
     }
@@ -45,14 +46,17 @@ public class VideoController {
         return RestBean.success(videoVoList);
     }
     @PostMapping("/search")
-    public Result search(@RequestBody SearchDto searchDto) {
-        List<Video> videoList=videoService.searchVideo(searchDto);
-        return Result.success(videoList);
+    public RestBean<Object> search(@RequestParam String keywords,
+                         @RequestParam("page_size") Integer pageSize,
+                         @RequestParam("page_num")Integer pageNum,
+                         @RequestParam String username) {
+        List<VideoVo> videoVoList=videoService.searchVideo(keywords,pageSize,pageNum,username);
+        return RestBean.success(videoVoList);
     }
     @GetMapping("/popular")
-    public Result popular(@RequestParam("page_size") Integer pageSize,
+    public RestBean<Object> popular(@RequestParam("page_size") Integer pageSize,
                                @RequestParam("page_num") Integer pageNum) {
-        List<Video> videoList=videoService.getPopularVideo(pageSize,pageNum);
-        return Result.success(videoList);
+        List<VideoVo> videoList=videoService.getPopularVideo(pageSize,pageNum);
+        return RestBean.success(videoList);
     }
 }

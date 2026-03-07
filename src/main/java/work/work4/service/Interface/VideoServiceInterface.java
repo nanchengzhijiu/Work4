@@ -16,7 +16,7 @@ public interface VideoServiceInterface {
     void publish(MultipartFile file, String title, String description, LoginUser loginUser) throws IOException;
     List<VideoVo> getVideoList(String userId, Integer pageNum, Integer pageSize);
 
-    List<Video> getPopularVideo(Integer pageSize, Integer pageNum);
+    List<VideoVo> getPopularVideo(Integer pageSize, Integer pageNum);
 
-    List<Video> searchVideo(SearchDto searchDto);
+    List<VideoVo> searchVideo(String keywords,Integer pageSize,Integer pageNum,String username);
 }
