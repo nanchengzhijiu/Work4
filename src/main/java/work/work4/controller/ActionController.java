@@ -2,9 +2,9 @@ package work.work4.controller;
 
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+import work.work4.common.RestBean;
 import work.work4.common.Result;
 import work.work4.dto.CommentDto;
-import work.work4.dto.LikeDto;
 import work.work4.pojo.Comment;
 import work.work4.pojo.Video;
 import work.work4.service.ActionService;
@@ -14,15 +14,13 @@ import java.util.List;
 public class ActionController {
     @Resource
     private ActionService actionService;
-    @GetMapping("/test")
-    public String test(){
-        return "HelloWorld";
-    }
 //    点赞
     @PostMapping("/like/action")
-    public Result action(@RequestBody LikeDto likeDto) {
-        actionService.likeAction(likeDto);
-        return Result.success();
+    public RestBean<Object> action(@RequestParam("video_id") String videoId,
+                           @RequestParam("comment_id") String commentId,
+                           @RequestParam("action_type") String actionType) {
+        actionService.likeAction(videoId,commentId,actionType);
+        return RestBean.success();
     }
     @GetMapping("like/list")
     public Result list(@RequestParam String userId,

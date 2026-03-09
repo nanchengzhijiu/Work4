@@ -13,6 +13,7 @@ public class Comment {
     private String id;
     private String userId;
     private String videoId;
+    private Integer likeCount;
     private String commentId;
     private String content;
     @TableField(fill= FieldFill.INSERT)

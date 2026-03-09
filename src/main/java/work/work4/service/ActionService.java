@@ -1,15 +1,14 @@
 package work.work4.service;
+import com.aliyun.core.utils.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import work.work4.dto.CommentDto;
-import work.work4.dto.LikeDto;
 import work.work4.mapper.CommentMapper;
 import work.work4.mapper.LikeMapper;
 import work.work4.mapper.VideoMapper;
-import work.work4.pojo.Like;
 import work.work4.pojo.Video;
 import work.work4.service.Interface.ActionServiceInterface;
 import work.work4.pojo.Comment;
@@ -30,44 +29,42 @@ public class ActionService implements ActionServiceInterface {
     private static final String VIDEO_LIKE_COUNT_KEY = "video:like:count:";
     private static final String COMMENT_LIKE_COUNT_KEY = "comment:like:count:";
     @Override
-    public void likeAction(LikeDto likeDto) {
-        String countKey;
-        if (likeDto.getCommentId()== null && likeDto.getVideoId() == null) {
-            return;
-        }
-        Like like = new Like().setCommentId(likeDto.getCommentId()).setVideoId(likeDto.getVideoId());
-        QueryWrapper<Like> wrapper = new QueryWrapper<>();
-        wrapper.eq(like.getVideoId() != null, "video_id", like.getVideoId())
-                .eq(like.getCommentId() != null, "comment_id", like.getCommentId());
-        // 更新点赞数
-        if (likeDto.getActionType()==1) {
-            like.setTotal(like.getTotal() + 1);
-        } else if (like.getTotal() > 0) {
-            like.setTotal(like.getTotal() - 1);
-        }
-        if(likeDto.getVideoId()!=null){
-            countKey=VIDEO_LIKE_COUNT_KEY+like.getVideoId();
-        }else{
-            countKey=COMMENT_LIKE_COUNT_KEY+like.getCommentId();
+    public void likeAction(String videoId, String commentId, String actionType) {
+        // 1. 互斥校验
+        boolean hasVideoId = !StringUtils.isEmpty(videoId);
+        boolean hasCommentId = !StringUtils.isEmpty(commentId);
+        if (hasVideoId == hasCommentId) {
+            throw new IllegalArgumentException("必须且只能提供一个 ID");
         }
 
-        // 如果Redis中已存在该key，进行增减操作
-        if (Boolean.TRUE.equals(template.hasKey(countKey))) {
-            if (likeDto.getActionType()==1) {
-                template.opsForValue().increment(countKey);
-            } else if (like.getTotal() > 0)  {
+        String id = hasVideoId ? videoId : commentId;
+        String countKey = hasVideoId ? VIDEO_LIKE_COUNT_KEY + id : COMMENT_LIKE_COUNT_KEY + id;
+        // 用于记录哪些 ID 的点赞数发生了变化
+        String dirtySetKey = hasVideoId ? "sync:video:ids" : "sync:comment:ids";
+
+        boolean isLike = "1".equals(actionType);
+
+        // 2. 如果缓存不存在，先初始化（防止缓存击穿导致的计数错误）
+        if (Boolean.FALSE.equals(template.hasKey(countKey))) {
+            Integer dbCount = hasVideoId ?
+                    videoMapper.selectById(id).getLikeCount() :
+                    commentMapper.selectById(id).getLikeCount();
+            template.opsForValue().set(countKey, String.valueOf(dbCount), 1, TimeUnit.DAYS);
+        }
+
+        // 3. 执行 Redis 原子增减
+        if (isLike) {
+            template.opsForValue().increment(countKey);
+        } else {
+            // 获取当前值，避免减成负数
+            Object val = template.opsForValue().get(countKey);
+            if (val != null && Long.parseLong(val.toString()) > 0) {
                 template.opsForValue().decrement(countKey);
             }
-        } else {
-            Video video;
-            // Redis中没有，从MySQL查询后设置
-            video=likeDto.getVideoId()!=null?videoMapper.selectById(likeDto.getVideoId()):videoMapper.selectById(likeDto.getCommentId());
-            if (video != null) {
-               template.opsForValue().set(countKey, video.getLikeCount().toString(), 1, TimeUnit.DAYS);
-            }
         }
-        // 执行更新
-        likeMapper.update(like, wrapper);
+
+        // 4. 将 ID 加入“待同步”集合
+        template.opsForSet().add(dirtySetKey, id);
     }
 
     @Override

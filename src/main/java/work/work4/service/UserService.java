@@ -65,7 +65,6 @@ public class UserService implements UserServiceInterface {
         BeanUtils.copyProperties(user, vo);
         vo.setToken(token);
         // 4. 存入 Redis 并设置过期时间 (例如 7 天)
-        // 这里的 Key 建议加个前缀，方便管理
         String redisKey = "login:token:" + token;
         redisTemplate.opsForValue().set(redisKey, vo, 7, TimeUnit.DAYS);
         return vo;
