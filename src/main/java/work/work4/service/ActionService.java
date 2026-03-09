@@ -84,18 +84,11 @@ public class ActionService implements ActionServiceInterface {
 
     @Override
     public List<Video> getLikeList(String userId,Integer pageSize,Integer pageNum) {
-        // 分页设置
-        Page<Video> page = new Page<>(pageNum, pageSize);
-
-        // 创建查询条件
-        QueryWrapper<Video> wrapper = new QueryWrapper<>();
-
-        // 子查询：从like表获取该用户点赞的video_id
-        wrapper.inSql("id",
-                "SELECT video_id FROM like WHERE user_id = " + userId + " AND video_id IS NOT NULL"
-        );
-        // 执行查询
-        return videoMapper.selectPage(page, wrapper).getRecords();
+        long start = (pageNum - 1) * pageSize;
+        long end = start + pageSize - 1;
+        // 返回按时间倒序排列的 targetId 集合
+        template.opsForZSet().reverseRange(USER_LIKE_ZSET + userId, start, end);
+        return null;
     }
 
     @Override

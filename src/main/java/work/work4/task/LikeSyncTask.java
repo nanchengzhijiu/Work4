@@ -66,7 +66,6 @@ public class LikeSyncTask {
                 String targetId = parts[1];
                 String type = parts[2];
                 boolean isVideo = Boolean.parseBoolean(parts[3]);
-
                 if ("1".equals(type)) {
                     Like like = new Like().setUserId(userId);
                     if (isVideo) like.setVideoId(targetId); else like.setCommentId(targetId);
