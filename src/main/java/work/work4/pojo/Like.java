@@ -10,11 +10,10 @@ import java.time.LocalDateTime;
 
 @Data
 @Accessors(chain = true)
-@TableName("like")
+@TableName("`like`")
 public class Like {
     private String id;
     private String videoId;
-    private Integer total;
     private String commentId;
     private String userId;
     @TableField(fill= FieldFill.INSERT)

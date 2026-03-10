@@ -8,6 +8,9 @@ import work.work4.dto.CommentDto;
 import work.work4.pojo.Comment;
 import work.work4.pojo.Video;
 import work.work4.service.ActionService;
+import work.work4.vo.CommentVo;
+import work.work4.vo.VideoVo;
+
 import java.util.List;
 
 @RestController
@@ -23,29 +26,29 @@ public class ActionController {
         return RestBean.success();
     }
     @GetMapping("like/list")
-    public Result list(@RequestParam String userId,
-                            @RequestParam Integer pageSize,
-                            @RequestParam Integer pageNum) {
-        List<Video> videoList=actionService.getLikeList(userId,pageSize,pageNum);
-        return Result.success(videoList);
+    public RestBean<Object> list(@RequestParam("user_id") String userId,
+                            @RequestParam("page_size") Integer pageSize,
+                            @RequestParam("page_num") Integer pageNum) {
+        List<VideoVo> videoList=actionService.getLikeList(userId,pageSize,pageNum);
+        return RestBean.success(videoList);
     }
 //    评论
     @PostMapping("/comment/publish")
-    public Result publishComment(@RequestBody CommentDto commentDto) {
-        actionService.comment(commentDto);
-        return Result.success();
+    public RestBean<Object> publishComment(@RequestParam("video_id")String videoId,@RequestParam("comment_id")String commentId,@RequestParam("content")String content) {
+        actionService.comment(videoId,commentId,content);
+        return RestBean.success();
     }
     @GetMapping("/comment/list")
-    public Result listComment(@RequestParam String videoId,
-                                     @RequestParam String commentId,
-                                     @RequestParam Integer pageSize,
-                                     @RequestParam Integer pageNum) {
-        List<Comment> commentList=actionService.getCommentList(videoId,commentId,pageSize,pageNum);
-        return Result.success(commentList);
+    public RestBean<Object> listComment(@RequestParam("video_id") String videoId,
+                                     @RequestParam("comment_id") String commentId,
+                                     @RequestParam("page_size") Integer pageSize,
+                                     @RequestParam("page_num") Integer pageNum) {
+        List<CommentVo> commentVoList=actionService.getCommentList(videoId,commentId,pageSize,pageNum);
+        return RestBean.success(commentVoList);
     }
     @DeleteMapping("/comment/delete")
-    public Result deleteComment(@RequestBody CommentDto commentDto) {
-        actionService.deleteComment(commentDto);
+    public Result deleteComment(@RequestParam("video_id")String videoId,@RequestParam("comment_id")String commentId) {
+        actionService.deleteComment(videoId,commentId);
         return Result.success();
     }
 }

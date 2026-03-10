@@ -2,6 +2,7 @@ package work.work4.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,6 +12,7 @@ import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Like;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -28,7 +30,6 @@ public class LikeSyncTask {
     @Scheduled(cron = "0 0/5 * * * ?")
     public void syncVideoLikeCount() {
         String dirtySetKey = "sync:video:ids";
-        String actionQueueKey = "queue:like:actions";
         // 1. 获取所有发生过变动的视频 ID
         Set<Object> videoIds = template.opsForSet().members(dirtySetKey);
         if (CollectionUtils.isEmpty(videoIds)) return;
@@ -52,30 +53,38 @@ public class LikeSyncTask {
     @Scheduled(cron = "0/30 * * * * ?")
     public void syncLikeRecords() {
         String queueKey = "queue:like:actions";
-        // 批量取出当前队列中所有消息
+        // 1. 获取队列中的原始 Object 列表
         List<Object> actions = template.opsForList().range(queueKey, 0, -1);
         if (CollectionUtils.isEmpty(actions)) return;
-
-        // 立即截断队列，防止重复消费
+        // 清理已读取的缓存
         template.opsForList().trim(queueKey, actions.size(), -1);
 
         for (Object action : actions) {
             try {
-                String[] parts = String.valueOf(action).split(":");
-                String userId = parts[0];
-                String targetId = parts[1];
-                String type = parts[2];
-                boolean isVideo = Boolean.parseBoolean(parts[3]);
+                // 【关键点】此时 action 是一个 Map (Fastjson 默认解析结果)
+                Map<String, Object> map = (Map<String, Object>) action;
+                String userId = String.valueOf(map.get("userId"));
+                String videoId = (String) map.get("videoId");
+                String commentId = (String) map.get("commentId");
+                String type = String.valueOf(map.get("actionType")); // "1"点赞 "0"取消
+                // 判断是视频还是评论
+                boolean isVideo = !StringUtils.isEmpty(videoId);
                 if ("1".equals(type)) {
-                    Like like = new Like().setUserId(userId);
-                    if (isVideo) like.setVideoId(targetId); else like.setCommentId(targetId);
-                    // 唯一索引冲突说明已点过，直接忽略
-                    likeMapper.insert(like);
+                    Like like = new Like().setUserId(userId)
+                            .setVideoId(videoId)
+                            .setCommentId(commentId);
+                    // 使用 insertIgnore 或 try-catch 处理唯一索引冲突
+                    try {
+                        likeMapper.insert(like);
+                    } catch (Exception ignored) {
+                        System.out.println("出错啦"+ignored);
+                    }
                 } else {
+                    // 执行删除逻辑
                     LambdaQueryWrapper<Like> qw = new LambdaQueryWrapper<Like>()
                             .eq(Like::getUserId, userId)
-                            .eq(isVideo, Like::getVideoId, targetId)
-                            .eq(!isVideo, Like::getCommentId, targetId);
+                            .eq(isVideo, Like::getVideoId, videoId)
+                            .eq(!isVideo, Like::getCommentId, commentId);
                     likeMapper.delete(qw);
                 }
             } catch (Exception e) {

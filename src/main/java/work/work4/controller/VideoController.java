@@ -7,10 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
 import work.work4.common.RestBean;
-import work.work4.common.Result;
-import work.work4.dto.SearchDto;
-import work.work4.dto.VideoUploadDto;
-import work.work4.pojo.Video;
 import work.work4.service.VideoService;
 import work.work4.vo.VideoVo;
 

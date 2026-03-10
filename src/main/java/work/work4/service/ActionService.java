@@ -1,23 +1,32 @@
 package work.work4.service;
+import com.alibaba.fastjson.JSON;
 import com.aliyun.core.utils.StringUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import work.work4.common.LoginUser;
 import work.work4.dto.CommentDto;
+import work.work4.dto.LikeDto;
 import work.work4.mapper.CommentMapper;
 import work.work4.mapper.LikeMapper;
 import work.work4.mapper.VideoMapper;
+import work.work4.pojo.Like;
 import work.work4.pojo.Video;
 import work.work4.service.Interface.ActionServiceInterface;
 import work.work4.pojo.Comment;
+import work.work4.vo.CommentVo;
+import work.work4.vo.VideoVo;
 
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class ActionService implements ActionServiceInterface {
@@ -73,50 +82,103 @@ public class ActionService implements ActionServiceInterface {
             }
             template.opsForZSet().remove(USER_LIKE_ZSET + userId, targetId);
         }
+        LikeDto likeDto = new LikeDto().setActionType(actionType);
+        if (hasVideoId) {
+            likeDto.setUserId(userId).setVideoId(targetId);
+        }else {
+            likeDto.setUserId(userId).setCommentId(targetId);;
+        }
+
         // 3. 将“点赞行为”存入 Redis List 消息队列
         // 数据格式：userId:targetId:type:isComment
-        String actionData = String.format("%s:%s:%s:%b",
-                userId, targetId, actionType, !hasVideoId);
-        template.opsForList().rightPush(actionQueueKey, actionData);
+        template.opsForList().rightPush(actionQueueKey, JSON.toJSONString(likeDto));
         // 4. 将 ID 加入“待同步”集合
         template.opsForSet().add(dirtySetKey, targetId);
     }
 
     @Override
-    public List<Video> getLikeList(String userId,Integer pageSize,Integer pageNum) {
-        long start = (pageNum - 1) * pageSize;
+    public List<VideoVo> getLikeList(String userId, Integer pageSize, Integer pageNum) {
+        long start = (long) (pageNum - 1) * pageSize;
         long end = start + pageSize - 1;
-        // 返回按时间倒序排列的 targetId 集合
-        template.opsForZSet().reverseRange(USER_LIKE_ZSET + userId, start, end);
-        return null;
+
+        // 2. 从 Redis ZSet 中获取按时间倒序的视频 ID 集合
+        Set<String> videoIds = template.opsForZSet().reverseRange(USER_LIKE_ZSET + userId, start, end);
+
+
+        if (CollectionUtils.isEmpty(videoIds)) {
+            return new ArrayList<>();
+        }
+        List<Object> idList = new ArrayList<>(videoIds);
+        // 4. 批量从数据库查询视频详情
+        // 注意：selectBatchIds 返回的顺序不一定匹配 idList 的顺序
+        List<Video> videos = videoMapper.selectVideosByIdList(idList);
+
+        // 5. 按照 idList 的原始顺序进行排序并转换为 VO
+        // (因为用户点赞列表通常要求严格按时间倒序，数据库批量查询会打乱顺序)
+        Map<String, Video> videoMap = videos.stream()
+                .collect(Collectors.toMap(Video::getId, v -> v));
+
+        return idList.stream()
+                .map(id -> {
+                    Video video = videoMap.get(id);
+                    VideoVo videoVo = new VideoVo();
+                    if (video == null) return null;
+                    // 转换为 VO 对象 (手动转换或使用 BeanUtils)
+                    BeanUtils.copyProperties(video, videoVo);
+                    return videoVo;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public void comment(CommentDto commentDto) {
-        if(commentDto.getCommentId()==null && commentDto.getVideoId()==null){
-            return;
+    public void comment(String videoId,String commentId,String content) {
+        // 1. 互斥校验
+        boolean hasVideoId = !StringUtils.isEmpty(videoId);
+        boolean hasCommentId = !StringUtils.isEmpty(commentId);
+        if (hasVideoId == hasCommentId) {
+            System.out.println("只能有一个id");
         }
-        Comment comment = new Comment();
-        if (commentDto.getCommentId() != null) {
-            comment.setCommentId(commentDto.getCommentId());
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new RuntimeException("用户未登录或认证失效");
+        }
+        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
+        String userId =loginUser.getUser().getId();
+        Comment comment = new Comment().setUserId(userId);
+        if (hasCommentId) {
+            comment.setCommentId(commentId);
         }else{
-            comment.setVideoId(commentDto.getVideoId());
+            comment.setVideoId(videoId);
         }
-        comment.setContent(commentDto.getCotent());
+        comment.setContent(content);
         commentMapper.insert(comment);
     }
 
     @Override
-    public List<Comment> getCommentList(String videoId,String commentId,Integer pageSize,Integer pageNum) {
+    public List<CommentVo> getCommentList(String videoId,String commentId,Integer pageSize,Integer pageNum) {
+        // 1. 互斥校验
+        boolean hasVideoId = !StringUtils.isEmpty(videoId);
+        boolean hasCommentId = !StringUtils.isEmpty(commentId);
+        if (hasVideoId == hasCommentId) {
+            System.out.println("只能有一个id");
+        }
         Page<Comment> page = new Page<>(pageNum, pageSize);
-        QueryWrapper<Comment> wrapper = new QueryWrapper<>();
-        wrapper.eq(videoId!=null,"video_id", videoId)
-                .eq(commentId!=null, "comment_id", commentId);
-        return commentMapper.selectPage(page, wrapper).getRecords();
+        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(hasVideoId,Comment::getVideoId, videoId)
+                .eq(hasCommentId, Comment::getCommentId, commentId);
+        List<CommentVo> videoVos=commentMapper.selectPage(page, wrapper).getRecords()
+                .stream()
+                .map(comment -> {
+                    CommentVo commentVo = new CommentVo();
+                    BeanUtils.copyProperties(comment, commentVo);
+                    return commentVo;
+                }).toList();
+        return videoVos;
     }
 
     @Override
-    public void deleteComment(CommentDto commentDto) {
-        commentMapper.deleteById(commentDto.getCommentId());
+    public void deleteComment(String videoId,String commentId) {
+        commentMapper.deleteById(commentId);
     }
 }

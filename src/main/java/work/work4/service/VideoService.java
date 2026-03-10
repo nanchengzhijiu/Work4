@@ -1,7 +1,6 @@
 package work.work4.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.PostConstruct;
@@ -13,7 +12,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
-import work.work4.dto.SearchDto;
 import work.work4.mapper.SearchMapper;
 import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Search;
@@ -22,7 +20,6 @@ import work.work4.pojo.Video;
 import work.work4.util.FileUtils;
 import work.work4.vo.VideoVo;
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -135,7 +132,7 @@ public class VideoService implements VideoServiceInterface {
             idSet = redisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
             if (CollectionUtils.isEmpty(idSet)) return Collections.emptyList();
         }
-        List<Object> videoIds = idSet.stream().map(Object::toString).collect(Collectors.toList());
+        List<Object> videoIds = new ArrayList<>(idSet);
         // 关键优化：使用 IN 查询，一次性查出所有数据 (批量查询)
         List<Video> videos = videoMapper.selectVideosByIdList(videoIds);
 
