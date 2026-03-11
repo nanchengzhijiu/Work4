@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
@@ -28,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class ActionService implements ActionServiceInterface {
     @Resource
@@ -41,6 +43,8 @@ public class ActionService implements ActionServiceInterface {
     private static final String VIDEO_LIKE_COUNT_KEY = "video:like:count:";
     private static final String COMMENT_LIKE_COUNT_KEY = "comment:like:count:";
     private static final String USER_LIKE_ZSET = "user:likes:";
+    private static final String COMMENT_COMMENT_COUNT_KEY = "comment:childComment:count:";
+    private static final String VIDEO_COMMENT_COUNT_KEY = "video:comment:count:";
     @Override
     public void likeAction(String videoId, String commentId, String actionType) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -145,14 +149,26 @@ public class ActionService implements ActionServiceInterface {
         }
         LoginUser loginUser=(LoginUser) authentication.getPrincipal();
         String userId =loginUser.getUser().getId();
+        String countKey = hasVideoId ? VIDEO_COMMENT_COUNT_KEY + videoId : COMMENT_COMMENT_COUNT_KEY + commentId;
+        String dirtySetKey = hasVideoId ? "sync:videoCommentCount:Ids" : "sync:commentChildCount:Ids";
+        String targetId = hasVideoId ? videoId : commentId;
+        if (Boolean.FALSE.equals(template.hasKey(countKey))) {
+            Integer dbCount = hasVideoId ?
+                    videoMapper.selectById(targetId).getCommentCount() :
+                    commentMapper.selectById(targetId).getChildCount();
+            template.opsForValue().set(countKey, String.valueOf(dbCount), 1, TimeUnit.DAYS);
+        }
+        template.opsForValue().increment(countKey);
         Comment comment = new Comment().setUserId(userId);
         if (hasCommentId) {
-            comment.setCommentId(commentId);
+            comment.setParentId(targetId);
         }else{
-            comment.setVideoId(videoId);
+            comment.setVideoId(targetId);
         }
         comment.setContent(content);
         commentMapper.insert(comment);
+        // 4. 将 ID 加入“待同步”集合
+        template.opsForSet().add(dirtySetKey, targetId);
     }
 
     @Override
@@ -166,19 +182,36 @@ public class ActionService implements ActionServiceInterface {
         Page<Comment> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(hasVideoId,Comment::getVideoId, videoId)
-                .eq(hasCommentId, Comment::getCommentId, commentId);
-        List<CommentVo> videoVos=commentMapper.selectPage(page, wrapper).getRecords()
+                .eq(hasCommentId, Comment::getParentId, commentId);
+        List<CommentVo> commentVos=commentMapper.selectPage(page, wrapper).getRecords()
                 .stream()
                 .map(comment -> {
                     CommentVo commentVo = new CommentVo();
                     BeanUtils.copyProperties(comment, commentVo);
                     return commentVo;
                 }).toList();
-        return videoVos;
+        return commentVos;
     }
 
     @Override
     public void deleteComment(String videoId,String commentId) {
-        commentMapper.deleteById(commentId);
+        boolean hasVideoId = !StringUtils.isEmpty(videoId);
+        boolean hasCommentId = !StringUtils.isEmpty(commentId);
+        if (hasVideoId == hasCommentId) {
+            System.out.println("只能有一个id");
+        }
+        System.out.println(1);
+        if (hasVideoId) {
+            LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Comment::getVideoId, videoId);
+            commentMapper.delete(wrapper);
+            template.opsForValue().getOperations().delete(VIDEO_COMMENT_COUNT_KEY + videoId);
+        } else {
+            LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Comment::getParentId, commentId).or()
+                            .eq(Comment::getId, commentId);
+            commentMapper.delete(wrapper);
+            template.opsForValue().getOperations().delete(COMMENT_COMMENT_COUNT_KEY + commentId);
+        }
     }
 }

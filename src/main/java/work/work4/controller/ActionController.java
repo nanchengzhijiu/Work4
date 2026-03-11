@@ -47,8 +47,8 @@ public class ActionController {
         return RestBean.success(commentVoList);
     }
     @DeleteMapping("/comment/delete")
-    public Result deleteComment(@RequestParam("video_id")String videoId,@RequestParam("comment_id")String commentId) {
+    public RestBean<Object> deleteComment(@RequestParam("video_id")String videoId,@RequestParam("comment_id")String commentId) {
         actionService.deleteComment(videoId,commentId);
-        return Result.success();
+        return RestBean.success();
     }
 }

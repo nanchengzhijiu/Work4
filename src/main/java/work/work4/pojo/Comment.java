@@ -15,7 +15,6 @@ public class Comment {
     private String id;
     private String userId;
     private String videoId;
-    private String commentId;
     private String parentId;
     private Integer likeCount;
     private Integer childCount;

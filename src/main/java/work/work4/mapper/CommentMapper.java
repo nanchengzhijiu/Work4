@@ -8,4 +8,6 @@ import work.work4.pojo.Comment;
 public interface CommentMapper extends BaseMapper<Comment> {
     @Select("update comment set like_count=#{likeCount} where id=#{commentId}")
     void updateLikeCount(String commentId, int likeCount);
+    @Select("update comment set child_count=#{commentCount} where id=#{commentId}")
+    void updateCommentCount(String commentId, int commentCount);
 }

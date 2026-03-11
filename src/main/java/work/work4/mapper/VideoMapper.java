@@ -12,4 +12,6 @@ public interface VideoMapper extends BaseMapper<Video> {
     List<Video> selectVideosByIdList(List<Object> idList);
     @Select("update video set like_count = #{likeCount} where id=#{videoId}")
     void updateLikeCount(String videoId, int likeCount);
+    @Select("update video set comment_count = #{commentCount} where id=#{videoId}")
+    void updateCommentCount(String videoId, int commentCount);
 }

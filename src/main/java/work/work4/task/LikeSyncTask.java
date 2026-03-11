@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import work.work4.mapper.CommentMapper;
 import work.work4.mapper.LikeMapper;
 import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Like;
@@ -26,8 +28,11 @@ public class LikeSyncTask {
     @Resource
     private LikeMapper likeMapper;
     private static final String VIDEO_LIKE_COUNT_KEY = "video:like:count:";
+    @Autowired
+    private CommentMapper commentMapper;
+
     // 每 5 分钟同步一次视频点赞数
-    @Scheduled(cron = "0 0/5 * * * ?")
+    @Scheduled(cron = "0/30 * * * * ?")
     public void syncVideoLikeCount() {
         String dirtySetKey = "sync:video:ids";
         // 1. 获取所有发生过变动的视频 ID
@@ -44,6 +49,26 @@ public class LikeSyncTask {
                 videoMapper.updateLikeCount(videoId, Integer.parseInt(count.toString()));
                 // 4. 同步完后从脏集合中移除
                 template.opsForSet().remove(dirtySetKey, videoId);
+            }
+        }
+    }
+    @Scheduled(cron = "0/30 * * * * ?")
+    public void syncCommentLikeCount() {
+        String dirtySetKey = "sync:comment:ids";
+        // 1. 获取所有发生过变动的视频 ID
+        Set<Object> commentIds = template.opsForSet().members(dirtySetKey);
+        if (CollectionUtils.isEmpty(commentIds)) return;
+        for (Object idObj : commentIds) {
+            String commentId = String.valueOf(idObj);
+            String countKey = VIDEO_LIKE_COUNT_KEY + commentId;
+
+            // 2. 从 Redis 获取最新值
+            Object count = template.opsForValue().get(countKey);
+            if (count != null) {
+                // 3. 更新数据库
+                commentMapper.updateLikeCount(commentId, Integer.parseInt(count.toString()));
+                // 4. 同步完后从脏集合中移除
+                template.opsForSet().remove(dirtySetKey, commentId);
             }
         }
     }
