@@ -1,10 +1,7 @@
 package work.work4.controller;
 import jakarta.annotation.Resource;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import work.work4.common.LoginUser;
 import work.work4.common.RestBean;
 import work.work4.service.UserService;
 import work.work4.vo.UserVo;
@@ -26,8 +23,8 @@ public class UserController {
         return RestBean.success(userService.login(username,password));
     }
     @GetMapping("/info")
-    public RestBean<Object> getUserInfo(@RequestParam String user_id) {
-        UserVo uservo=userService.getUser(user_id);
+    public RestBean<Object> getUserInfo(@RequestParam("user_id") String userId) {
+        UserVo uservo=userService.getUser(userId);
         return RestBean.success(uservo);
     }
     @PutMapping("/avatar/upload")

@@ -2,11 +2,10 @@ package work.work4.controller;
 
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
-import work.work4.common.Result;
-import work.work4.dto.FollowDto;
-import work.work4.pojo.Follow;
-import work.work4.pojo.Friend;
+import work.work4.common.RestBean;
 import work.work4.service.SocialService;
+import work.work4.vo.FollowVo;
+
 import java.util.List;
 
 @RestController
@@ -14,31 +13,33 @@ public class SocialController {
     @Resource
     private SocialService socialService;
 //    关注
-    @PostMapping("/following/action")
-    public Result followAction(@RequestBody FollowDto followDto) {
-        socialService.followAction(followDto);
-        return Result.success();
+    @PostMapping("/relation/action")
+    public RestBean<Object> followAction(@RequestParam("to_user_id") String toUserId,
+                                         @RequestParam("action_type") String actionType) {
+        socialService.followAction(toUserId,actionType);
+        return RestBean.success();
     }
     @GetMapping("/following/list")
-    public Result getFollowList(@RequestParam String userId,
-                                      @RequestParam Integer pageNum,
-                                      @RequestParam Integer pageSize) {
-        List<Follow> userList=socialService.getFollowList(userId,pageNum,pageSize);
-        return Result.success(userList);
+    public RestBean<Object> getFollowList(@RequestParam("user_id") String userId,
+                                      @RequestParam("page_num") Integer pageNum,
+                                      @RequestParam("page_size") Integer pageSize) {
+        List<FollowVo> userList=socialService.getFollowList(userId,pageNum,pageSize);
+        return RestBean.success(userList);
     }
 //    粉丝
     @GetMapping("/follower/list")
-    public Result getFanList(@RequestParam String userId,
-                                    @RequestParam Integer pageNum,
-                                    @RequestParam Integer pageSize) {
+    public RestBean<Object> getFanList(@RequestParam("user_id") String userId,
+                                    @RequestParam("page_num") Integer pageNum,
+                                    @RequestParam("page_size") Integer pageSize) {
 
-        List<Follow> userList=socialService.getFanList(userId,pageNum,pageSize);
-        return Result.success(userList);
+        List<FollowVo> userList=socialService.getFanList(userId,pageNum,pageSize);
+        return RestBean.success(userList);
     }
 //    好友
     @GetMapping("/friends/list")
-    public Result getFriends(@RequestParam String userId,@RequestParam Integer pageNum, @RequestParam Integer pageSize) {
-        List<Friend> userList=socialService.getFriendList(userId,pageNum,pageSize);
-        return Result.success(userList);
+    public RestBean<Object> getFriends(@RequestParam("page_num") Integer pageNum,
+                                       @RequestParam("page_size") Integer pageSize) {
+        List<FollowVo> userList=socialService.getFriendList(pageNum,pageSize);
+        return RestBean.success(userList);
     }
 }

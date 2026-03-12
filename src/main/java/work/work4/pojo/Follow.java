@@ -10,5 +10,5 @@ import lombok.experimental.Accessors;
 public class Follow {
     private String id;
     private String userId;
-    private String followId;
+    private String toUserId;
 }
