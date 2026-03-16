@@ -8,6 +8,6 @@ import java.io.IOException;
 public interface UserServiceInterface {
     void register(String username, String password);
     UserVo login(String username, String password);
-    UserVo getUser(String userId);
-    UserVo uploadAvatar(MultipartFile file) throws IOException;
+    UserVo getUser(String userId,String token);
+    UserVo uploadAvatar(MultipartFile file,String token) throws IOException;
 }

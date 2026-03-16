@@ -1,12 +1,13 @@
 package work.work4.service;
+import cn.hutool.core.bean.BeanUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +23,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -36,6 +38,8 @@ public class UserService implements UserServiceInterface {
     private AuthenticationManager authenticationManager;
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     @Resource
     private FileUtils fileUtil;
     @Override
@@ -64,34 +68,30 @@ public class UserService implements UserServiceInterface {
         UserVo vo = new UserVo();
         BeanUtils.copyProperties(user, vo);
         vo.setToken(token);
-        // 4. 存入 Redis 并设置过期时间 (例如 7 天)
+        Map<String,Object> usermap= BeanUtil.beanToMap(vo);
+        // 4. 存入 Redis 并设置过期时间 (例如 30 天)
         String redisKey = "login:token:" + token;
-        redisTemplate.opsForValue().set(redisKey, vo, 7, TimeUnit.DAYS);
+        redisTemplate.opsForHash().putAll(redisKey, usermap);
+        redisTemplate.expire(redisKey, 30, TimeUnit.MINUTES);
         return vo;
     }
 
     @Override
-    public UserVo getUser(String userId) {
-        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new RuntimeException("用户未登录或认证失效");
-        }
-        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
-        String currentLoginId =loginUser.getUser().getId();
-
+    public UserVo getUser(String userId,String token) {
+        // 拿到当前登录者的真实 ID
+        String redisKey = "login:token:" + token;
+        String currentLoginId =redisTemplate.opsForHash().get(redisKey,"id").toString();
         // 2. 判断当前登录人是否有权操作这个 userId
         // 只能查自己的信息
         if (!currentLoginId.equals(userId)) {
             System.out.println("用户信息不匹配");
+            return null;
         }
-
         // 3.此时 userId 已经被验证是属于当前登录人的
         User user = userMapper.selectById(userId);
         if (user == null) {
             System.out.println("用户不存在");
         }
-
         // 4. 【包装返回】
         UserVo vo = new UserVo();
         BeanUtils.copyProperties(user, vo);
@@ -100,12 +100,7 @@ public class UserService implements UserServiceInterface {
     }
 
     @Override
-    public UserVo uploadAvatar(MultipartFile file) throws IOException{
-        // 1.从 SecurityContext 中拿到当前登录者的真实 ID
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new RuntimeException("用户未登录或认证失效");
-        }
+    public UserVo uploadAvatar(MultipartFile file,String token) throws IOException{
         try (InputStream is = file.getInputStream()) {
             // 尝试读取图片，如果不是真正的图片格式，ImageIO 会返回 null
             BufferedImage bi = ImageIO.read(is);
@@ -115,8 +110,10 @@ public class UserService implements UserServiceInterface {
         } catch (IOException e) {
             throw new RuntimeException("图片解析异常");
         }
-        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
-        User user = userMapper.selectById(loginUser.getUser().getId());
+        // 拿到当前登录者的真实 ID
+        String redisKey = "login:token:" + token;
+        String currentLoginId =redisTemplate.opsForHash().get(redisKey,"id").toString();
+        User user = userMapper.selectById(currentLoginId);
         user.setAvatarUrl(fileUtil.uploadPicture(file));
         userMapper.updateById(user);
         UserVo vo = new UserVo();

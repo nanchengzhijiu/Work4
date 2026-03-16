@@ -23,12 +23,12 @@ public class UserController {
         return RestBean.success(userService.login(username,password));
     }
     @GetMapping("/info")
-    public RestBean<Object> getUserInfo(@RequestParam("user_id") String userId) {
-        UserVo uservo=userService.getUser(userId);
+    public RestBean<Object> getUserInfo(@RequestParam("user_id") String userId,@RequestHeader("Access-Token") String token) {
+        UserVo uservo=userService.getUser(userId,token);
         return RestBean.success(uservo);
     }
     @PutMapping("/avatar/upload")
-    public RestBean<Object> uploadUserAvatar(@RequestParam MultipartFile data) throws IOException {
-        return RestBean.success(userService.uploadAvatar(data));
+    public RestBean<Object> uploadUserAvatar(@RequestParam MultipartFile data,@RequestHeader("Access-Token") String token) throws IOException {
+        return RestBean.success(userService.uploadAvatar(data,token));
     }
 }

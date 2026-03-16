@@ -29,8 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             //开始解析成UserDetails对象，如果得到的是null说明解析失败，JWT有问题
             UserDetails user = JwtUtils.resolveJwt(token);
             String redisKey = "login:token:" + token;
-            Object userVo = redisTemplate.opsForValue().get(redisKey);
-            if(userVo != null && user!=null) {
+            Boolean hasUserVo = redisTemplate.hasKey(redisKey);
+            if(hasUserVo && user!=null) {
                 //验证没有问题，那么就可以开始创建Authentication了，这里我们跟默认情况保持一致
                 //使用UsernamePasswordAuthenticationToken作为实体，填写相关用户信息进去
                 UsernamePasswordAuthenticationToken authentication =
