@@ -11,6 +11,8 @@ import work.work4.mapper.VideoMapper;
 
 import java.util.Set;
 
+import static work.work4.common.RedisConstants.*;
+
 @Component
 public class CommentSyncTask {
     @Resource
@@ -19,9 +21,6 @@ public class CommentSyncTask {
     private CommentMapper commentMapper;
     @Resource
     private VideoMapper videoMapper;
-    private static final String COMMENT_LIKE_COUNT_KEY = "comment:like:count:";
-    private static final String COMMENT_COMMENT_COUNT_KEY = "comment:childComment:count:";
-    private static final String VIDEO_COMMENT_COUNT_KEY = "video:comment:count:";
     @Scheduled(cron = "0/30 * * * * ?")
     public void syncCommentLikeCount() {
         String dirtySetKey="sync:comment:ids";

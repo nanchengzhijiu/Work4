@@ -1,5 +1,7 @@
 package work.work4.service;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -7,11 +9,12 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.DefaultTypedTuple;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
+import work.work4.common.RestBean;
 import work.work4.mapper.SearchMapper;
 import work.work4.mapper.VideoMapper;
 import work.work4.pojo.Search;
@@ -24,6 +27,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static work.work4.common.RedisConstants.*;
+
 @Service
 public class VideoService implements VideoServiceInterface {
     @Resource
@@ -33,19 +38,17 @@ public class VideoService implements VideoServiceInterface {
     @Resource
     private FileUtils fileUtils;
     // Redis key常量
-    private static final String VIDEO_VISIT_RANKING = "video:ranking:visit";// 点击率排行榜
-    private static final String VIDEO_POOL_KEY = "video:global:pool";//随机池
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
     @PostConstruct
     public void initRanking() {
         // 加载点击率排行榜
         refreshVisitRanking();
     }
     @Override
-    public List<VideoVo> getVideoStream(String latest_time) {
+    public RestBean<Object> getVideoStream(String latest_time) {
         // 1. 从 Redis 随机抽取 20 个视频 ID
-        List<Object> randomIds = redisTemplate.opsForSet().randomMembers(VIDEO_POOL_KEY, 20);
+        List<String> randomIds = stringRedisTemplate.opsForSet().randomMembers(VIDEO_POOL_KEY, 20);
 
         if (randomIds == null || randomIds.isEmpty()) {
             // 如果 Redis 为空（初次启动），可以从数据库保底查几条
@@ -58,7 +61,7 @@ public class VideoService implements VideoServiceInterface {
             BeanUtils.copyProperties(video, vo);
             return vo;
         }).toList();
-        return videoVos;
+        return RestBean.success(videoVos);
     }
 
     @Override
@@ -79,22 +82,22 @@ public class VideoService implements VideoServiceInterface {
                 .setVideoUrl(videoFileName)
                 .setCoverUrl(coverFileName);
         videoMapper.insert(video);
-        redisTemplate.opsForSet().add(VIDEO_POOL_KEY, video.getId());
+        stringRedisTemplate.opsForSet().add(VIDEO_POOL_KEY, video.getId());
     }
     @Override
-    public List<VideoVo> getVideoList(String userId, Integer pageNum, Integer pageSize) {
+    public RestBean<Object> getVideoList(String userId, Integer pageNum, Integer pageSize) {
         Page<Video> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Video::getUserId, userId);
         List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
         if (CollectionUtils.isEmpty(videos)) {
-            return Collections.emptyList();
+            return RestBean.success(Collections.emptyList());
         }
-        return videos.stream().map(video -> {
+        return RestBean.success(videos.stream().map(video -> {
             VideoVo vo = new VideoVo();
             BeanUtils.copyProperties(video, vo);
             return vo;
-        }).collect(Collectors.toList());
+        }).collect(Collectors.toList()));
     }
     public void refreshVisitRanking() {
         List<Video> topVideos = videoMapper.selectList(new LambdaQueryWrapper<Video>()
@@ -105,34 +108,41 @@ public class VideoService implements VideoServiceInterface {
             return;
         }
         // 2. 准备数据：使用 Stream API 快速构建 TypedTuple 集合
-        Set<ZSetOperations.TypedTuple<Object>> tuples = topVideos.stream()
-                .map(v -> new DefaultTypedTuple<>((Object) v.getId(), v.getVisitCount().doubleValue()))
+        Set<ZSetOperations.TypedTuple<String>> tuples = topVideos.stream()
+                .map(v -> {
+                    // 显式将 ID 转为 String，避免序列化异常
+                    String videoId = String.valueOf(v.getId());
+                    Double score = v.getVisitCount().doubleValue();
+                    return new DefaultTypedTuple<>(videoId, score);
+                })
                 .collect(Collectors.toSet());
         // 3. 使用临时 Key 刷新,防止刷新时正在写入redis
         String tempKey = VIDEO_VISIT_RANKING + ":temp";
         // 写入临时 Key 并设置过期时间
-        redisTemplate.opsForZSet().add(tempKey, tuples);
-        redisTemplate.expire(tempKey, 7, TimeUnit.DAYS);
+        stringRedisTemplate.opsForZSet().add(tempKey, tuples);
+        stringRedisTemplate.expire(tempKey, 30, TimeUnit.DAYS);
         // 重命名临时 Key 为正式 Key
         // 这样在刷新的一瞬间，旧数据直接被覆盖，用户永远不会读到空数据
-        redisTemplate.rename(tempKey, VIDEO_VISIT_RANKING);
+        stringRedisTemplate.rename(tempKey, VIDEO_VISIT_RANKING);
     }
     @Override
-    public List<VideoVo> getPopularVideo(Integer pageSize, Integer pageNum) {
+    public RestBean<Object> getPopularVideo(Integer pageSize, Integer pageNum) {
         //获取排行版
         int start=(pageNum-1)*pageSize;
         int end = start + pageSize - 1;
         //  从 ZSet 获取视频 ID 列表
-        Set<Object> idSet = redisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
+        Set<String> idSet = stringRedisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
         //  缓存缺失处理
         if (CollectionUtils.isEmpty(idSet)) {
             // 建议：此处可以引入分布式锁，防止并发刷库
             refreshVisitRanking();
             // 刷新后重新获取一次
-            idSet = redisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
-            if (CollectionUtils.isEmpty(idSet)) return Collections.emptyList();
+            idSet = stringRedisTemplate.opsForZSet().reverseRange(VIDEO_VISIT_RANKING, start, end);
+            if (CollectionUtils.isEmpty(idSet))
+                return
+                    RestBean.success(Collections.emptyList());
         }
-        List<Object> videoIds = new ArrayList<>(idSet);
+        List<String> videoIds = new ArrayList<>(idSet);
         // 关键优化：使用 IN 查询，一次性查出所有数据 (批量查询)
         List<Video> videos = videoMapper.selectVideosByIdList(videoIds);
 
@@ -145,25 +155,39 @@ public class VideoService implements VideoServiceInterface {
                 })
                 .collect(Collectors.toMap(VideoVo::getId, v -> v));
         //再通过videoIds流按顺序整理
-        return videoIds.stream()
+        return RestBean.success(videoIds.stream()
                 .map(videoMap::get)
                 .filter(Objects::nonNull) // 过滤掉数据库里可能不存在的视频
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
     }
     @Override
-    public List<VideoVo> searchVideo(String keywords,Integer pageSize,Integer pageNum,String username) {
-        Page<Video> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Video::getTitle, keywords)
-                .eq(Video::getUsername, username);
-        Search search = new Search().setKeyword(keywords);
-        searchMapper.insert(search);
-        List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
-        List<VideoVo> videoVos=videos.stream().map((v)->{
-            VideoVo vo = new VideoVo();
-            BeanUtils.copyProperties(v, vo);
-            return vo;
-        }).collect(Collectors.toList());
-        return videoVos;
+    public RestBean<Object> searchVideo(String keywords,Integer pageSize,Integer pageNum,String username) {
+        // 增加分页参数到 key 中，否则不同页码会拿到相同缓存
+        String redisKey = VIDEO_CACHE_KEY + username + ":" + keywords + ":" + pageNum;
+        String video = stringRedisTemplate.opsForValue().get(redisKey);
+        List<VideoVo> videoVos;
+        if(StrUtil.isNotBlank(video)){
+            videoVos = JSONUtil.toList(video, VideoVo.class);
+            return RestBean.success(videoVos);
+        }else{
+            Page<Video> page = new Page<>(pageNum, pageSize);
+            LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Video::getTitle, keywords)
+                    .eq(Video::getUsername, username);
+            Search search = new Search().setKeyword(keywords);
+            searchMapper.insert(search);
+            List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
+            videoVos=videos.stream().map((v)->{
+                VideoVo vo = new VideoVo();
+                BeanUtils.copyProperties(v, vo);
+                return vo;
+            }).collect(Collectors.toList());
+            // 3. 写入缓存
+            if (CollectionUtils.isNotEmpty(videoVos)) {
+                // 将整个 List 序列化并存入 String 类型
+                stringRedisTemplate.opsForValue().set(redisKey, JSONUtil.toJsonStr(videoVos), 30, TimeUnit.MINUTES);
+            }
+        }
+        return RestBean.success(videoVos);
     }
 }

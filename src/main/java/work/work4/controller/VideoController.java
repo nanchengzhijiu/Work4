@@ -20,7 +20,7 @@ public class VideoController {
     private VideoService videoService;
     @GetMapping("/feed")
     public RestBean<Object> getVideoStream(@RequestParam String latest_time){
-        return RestBean.success(videoService.getVideoStream(latest_time));
+        return videoService.getVideoStream(latest_time);
     }
     @PostMapping("/publish")
     public RestBean<Object> publish(@RequestParam MultipartFile data, @RequestParam String title, @RequestParam String description) throws IOException {
@@ -38,21 +38,18 @@ public class VideoController {
     public RestBean<Object> list(@RequestParam("user_id") String userId,
                             @RequestParam("page_num") Integer pageNum,
                             @RequestParam("page_size") Integer pageSize) {
-        List<VideoVo> videoVoList=videoService.getVideoList(userId,pageNum,pageSize);
-        return RestBean.success(videoVoList);
+        return videoService.getVideoList(userId,pageNum,pageSize);
     }
     @PostMapping("/search")
     public RestBean<Object> search(@RequestParam String keywords,
                          @RequestParam("page_size") Integer pageSize,
                          @RequestParam("page_num")Integer pageNum,
                          @RequestParam String username) {
-        List<VideoVo> videoVoList=videoService.searchVideo(keywords,pageSize,pageNum,username);
-        return RestBean.success(videoVoList);
+        return videoService.searchVideo(keywords,pageSize,pageNum,username);
     }
     @GetMapping("/popular")
     public RestBean<Object> popular(@RequestParam("page_size") Integer pageSize,
                                @RequestParam("page_num") Integer pageNum) {
-        List<VideoVo> videoList=videoService.getPopularVideo(pageSize,pageNum);
-        return RestBean.success(videoList);
+        return videoService.getPopularVideo(pageSize,pageNum);
     }
 }

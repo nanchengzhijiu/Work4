@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static work.work4.common.RedisConstants.VIDEO_LIKE_COUNT_KEY;
+
 
 @Component
 public class LikeSyncTask {
@@ -27,7 +29,6 @@ public class LikeSyncTask {
     private VideoMapper videoMapper;
     @Resource
     private LikeMapper likeMapper;
-    private static final String VIDEO_LIKE_COUNT_KEY = "video:like:count:";
     @Autowired
     private CommentMapper commentMapper;
 

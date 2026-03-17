@@ -72,13 +72,6 @@ public class SecurityConfig {
                 // 将 JWT 过滤器放在用户名密码过滤器之前
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
-//                .logout(conf -> {
-//                    conf.logoutUrl("/user/logout");
-//                    conf.logoutSuccessHandler(this::onLogoutSuccess);
-//                })
-//                .sessionManagement(conf -> {
-//                    conf.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-//                })
     }
     // 统一处理异常返回
     private void handleError(HttpServletRequest request,
@@ -93,13 +86,5 @@ public class SecurityConfig {
             errorRes=RestBean.error("unauthorized");
         }
         writer.write(JSON.toJSONString(errorRes));
-    }
-    private void onLogoutSuccess(HttpServletRequest request,
-                                 HttpServletResponse response,
-                                 Authentication authentication) throws IOException {
-        response.setContentType("application/json;charset=utf-8");
-        PrintWriter writer = response.getWriter();
-        String authorization = request.getHeader("Authorization");
-        writer.write(RestBean.error("退出登录失败").toString());
     }
 }
