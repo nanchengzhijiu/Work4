@@ -15,11 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
 import work.work4.common.RestBean;
-import work.work4.mapper.SearchMapper;
 import work.work4.mapper.VideoMapper;
-import work.work4.pojo.Search;
 import work.work4.service.Interface.VideoServiceInterface;
 import work.work4.pojo.Video;
+import work.work4.util.CacheUtil;
 import work.work4.util.FileUtils;
 import work.work4.vo.VideoVo;
 import java.io.IOException;
@@ -34,9 +33,9 @@ public class VideoService implements VideoServiceInterface {
     @Resource
     private VideoMapper videoMapper;
     @Resource
-    private SearchMapper searchMapper;
-    @Resource
     private FileUtils fileUtils;
+    @Resource
+    private CacheUtil cacheUtil;
     // Redis key常量
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -161,41 +160,38 @@ public class VideoService implements VideoServiceInterface {
                 .collect(Collectors.toList()));
     }
     @Override
-    public RestBean<Object> searchVideo(String keywords,Integer pageSize,Integer pageNum,String username) {
-        // 增加分页参数到 key 中，否则不同页码会拿到相同缓存
-        String redisKey = VIDEO_CACHE_KEY + username + ":" + keywords + ":" + pageNum+":"+pageSize;
-        String video = stringRedisTemplate.opsForValue().get(redisKey);
-        List<VideoVo> videoVos;
-//      缓存中有数据，且数据不是null或空字符(即存放的是有信息的video)
-        if(StrUtil.isNotBlank(video)){
-            videoVos = JSONUtil.toList(video, VideoVo.class);
-            return RestBean.success(videoVos);
+    public RestBean<Object> searchVideo(String keywords, Integer pageSize, Integer pageNum, String username) {
+        // 1. 拼接 Key
+        String redisKey = VIDEO_CACHE_KEY + username + ":" + keywords + ":" + pageNum + ":" + pageSize;
+
+        // 2. 调用工具类（只处理缓存穿透）
+        // 注意：由于返回的是 List，List.class 在反序列化时会有泛型擦除风险
+        // 如果之后遇到类型转换问题，可以将 toBean 改为 toList
+        List<VideoVo> vos = cacheUtil.queryWithPassThrough(
+                redisKey, 30L, TimeUnit.MINUTES, List.class,VideoVo.class,
+                () -> {
+                    // 这里是真正的数据库查询逻辑
+                    Page<Video> page = new Page<>(pageNum, pageSize);
+                    LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<Video>()
+                            .eq(Video::getTitle, keywords)
+                            .eq(Video::getUsername, username);
+
+                    List<Video> records = videoMapper.selectPage(page, wrapper).getRecords();
+
+                    if (CollectionUtils.isEmpty(records)) return null;
+
+                    // 转换 VO
+                    return records.stream().map(v -> {
+                        VideoVo vo = new VideoVo();
+                        BeanUtils.copyProperties(v, vo);
+                        return vo;
+                    }).collect(Collectors.toList());
+                });
+
+        // 3. 结果返回
+        if (vos == null) {
+            return RestBean.error("未找到相关视频");
         }
-//        缓存中有该数据且数据不是null(即是空字符)
-        if(video!=null){
-            return RestBean.error("店铺信息不存在");
-        }
-//        如果缓存没有，则查询数据库，并创建缓存
-        Page<Video> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<Video> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Video::getTitle, keywords)
-                .eq(Video::getUsername, username);
-        Search search = new Search().setKeyword(keywords);
-        searchMapper.insert(search);
-        List<Video> videos = videoMapper.selectPage(page,wrapper).getRecords();
-        videoVos=videos.stream().map((v)->{
-            VideoVo vo = new VideoVo();
-            BeanUtils.copyProperties(v, vo);
-            return vo;
-        }).collect(Collectors.toList());
-        // 3. 写入缓存,如果数据库里有则创建缓存，没有则创建空数据缓存
-        if (CollectionUtils.isNotEmpty(videoVos)) {
-            // 将整个 List 序列化并存入 String 类型
-            stringRedisTemplate.opsForValue().set(redisKey, JSONUtil.toJsonStr(videoVos), 30, TimeUnit.MINUTES);
-        }else {
-            stringRedisTemplate.opsForValue().set(redisKey, "", 2, TimeUnit.MINUTES);
-            return RestBean.error("数据库不存在该数据");
-        }
-        return RestBean.success(videoVos);
+        return RestBean.success(vos);
     }
 }

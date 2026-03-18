@@ -23,9 +23,12 @@ import work.work4.pojo.Like;
 import work.work4.pojo.Video;
 import work.work4.service.Interface.ActionServiceInterface;
 import work.work4.pojo.Comment;
+import work.work4.util.RedisData;
+import work.work4.util.UserContext;
 import work.work4.vo.CommentVo;
 import work.work4.vo.VideoVo;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -43,12 +46,7 @@ public class ActionService implements ActionServiceInterface {
     private StringRedisTemplate stringRedisTemplate;
     @Override
     public void likeAction(String videoId, String commentId, String actionType) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new RuntimeException("用户未登录或认证失效");
-        }
-        LoginUser loginUser=(LoginUser) authentication.getPrincipal();
-        String userId =loginUser.getUser().getId();
+        String userId = UserContext.getUserId();
         // 1. 互斥校验
         boolean hasVideoId = !StringUtils.isEmpty(videoId);
         boolean hasCommentId = !StringUtils.isEmpty(commentId);
@@ -65,6 +63,7 @@ public class ActionService implements ActionServiceInterface {
 
         // 2. 如果缓存不存在，先初始化（防止缓存击穿导致的计数错误）
         if (Boolean.FALSE.equals(stringRedisTemplate.hasKey(countKey))) {
+
             Integer dbCount = hasVideoId ?
                     videoMapper.selectById(targetId).getLikeCount() :
                     commentMapper.selectById(targetId).getLikeCount();

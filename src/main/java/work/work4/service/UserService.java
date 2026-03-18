@@ -16,6 +16,7 @@ import work.work4.common.RestBean;
 import work.work4.mapper.UserMapper;
 import work.work4.pojo.User;
 import work.work4.service.Interface.UserServiceInterface;
+import work.work4.util.CacheUtil;
 import work.work4.util.FileUtils;
 import work.work4.util.JwtUtils;
 import work.work4.util.UserContext;
@@ -43,6 +44,8 @@ public class UserService implements UserServiceInterface {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private FileUtils fileUtil;
+    @Resource
+    private CacheUtil cacheUtil;
     @Override
     public void register(String username, String password) {
 //        加密注册
@@ -71,7 +74,7 @@ public class UserService implements UserServiceInterface {
         vo.setToken(token);
         // 4. 存入 Redis 并设置过期时间 (例如 30 天)
         String redisKey = LOGIN_TOKEN_KEY + token;
-        stringRedisTemplate.opsForValue().set(redisKey, vo.getId(), 30, TimeUnit.DAYS);
+        cacheUtil.set(redisKey, vo.getId(), 30L, TimeUnit.DAYS);
         return RestBean.success(vo);
     }
 
