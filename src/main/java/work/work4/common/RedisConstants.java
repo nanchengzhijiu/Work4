@@ -2,6 +2,8 @@ package work.work4.common;
 
 public class RedisConstants {
     public static final String LOGIN_TOKEN_KEY = "login:token:";//缓存池子
+    public static final String VIDEO_LIKE_ZSET = "video:likes:";
+    public static final String COMMENT_LIKE_ZSET = "comment:likes:";
     public static final String VIDEO_LIKE_COUNT_KEY = "video:like:count:";
     public static final String COMMENT_LIKE_COUNT_KEY = "comment:like:count:";
     public static final String USER_LIKE_ZSET = "user:likes:";

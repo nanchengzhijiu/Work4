@@ -152,6 +152,7 @@ public class CacheUtil {
         return BooleanUtil.isTrue(flag);
     }
     public void releaseLock(String key) {
+
         stringRedisTemplate.delete(key);
     }
 }

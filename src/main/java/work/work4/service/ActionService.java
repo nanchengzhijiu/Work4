@@ -1,4 +1,5 @@
 package work.work4.service;
+import cn.hutool.core.util.BooleanUtil;
 import com.alibaba.fastjson.JSON;
 import com.aliyun.core.utils.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -43,6 +44,8 @@ public class ActionService implements ActionServiceInterface {
     @Resource
     private VideoMapper videoMapper;
     @Resource
+    private LikeMapper likeMapper;
+    @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Override
     public void likeAction(String videoId, String commentId, String actionType) {
@@ -52,6 +55,7 @@ public class ActionService implements ActionServiceInterface {
         boolean hasCommentId = !StringUtils.isEmpty(commentId);
         String targetId = hasVideoId ? videoId : commentId;
         String countKey = hasVideoId ? VIDEO_LIKE_COUNT_KEY + targetId : COMMENT_LIKE_COUNT_KEY + targetId;
+        String likeKey= hasVideoId ? VIDEO_LIKE_ZSET + targetId : COMMENT_LIKE_ZSET + targetId;
         String dirtySetKey = hasVideoId ? "sync:video:ids" : "sync:comment:ids";
         // 行为记录 Key (用于异步写入 Like 表)
         String actionQueueKey = "queue:like:actions";
@@ -70,16 +74,21 @@ public class ActionService implements ActionServiceInterface {
             stringRedisTemplate.opsForValue().set(countKey, String.valueOf(dbCount), 1, TimeUnit.DAYS);
         }
         if (isLike) {
-            stringRedisTemplate.opsForValue().increment(countKey);
             // 实时维护用户点赞列表 (ZSet)，Score 用当前时间戳用于排序
-            stringRedisTemplate.opsForZSet().add(USER_LIKE_ZSET + userId, targetId, System.currentTimeMillis());
+            Double score=stringRedisTemplate.opsForZSet().score(likeKey,userId);
+            if(score!=null){
+                log.error("只能点赞一次");
+                return;
+            }
+            stringRedisTemplate.opsForValue().increment(countKey);
+            stringRedisTemplate.opsForZSet().add(likeKey, userId, System.currentTimeMillis());
         } else {
             // 获取当前值，避免减成负数
             Object val = stringRedisTemplate.opsForValue().get(countKey);
             if (val != null && Long.parseLong(val.toString()) > 0) {
                 stringRedisTemplate.opsForValue().decrement(countKey);
             }
-            stringRedisTemplate.opsForZSet().remove(USER_LIKE_ZSET + userId, targetId);
+            stringRedisTemplate.opsForZSet().remove(likeKey, targetId);
         }
         LikeDto likeDto = new LikeDto().setActionType(actionType);
         if (hasVideoId) {
@@ -87,7 +96,6 @@ public class ActionService implements ActionServiceInterface {
         }else {
             likeDto.setUserId(userId).setCommentId(targetId);;
         }
-
         // 3. 将“点赞行为”存入 Redis List
         // 数据格式：userId:targetId:type:isComment
         stringRedisTemplate.opsForList().rightPush(actionQueueKey, JSON.toJSONString(likeDto));
@@ -99,15 +107,8 @@ public class ActionService implements ActionServiceInterface {
     public RestBean<Object> getLikeList(String userId, Integer pageSize, Integer pageNum) {
         long start = (long) (pageNum - 1) * pageSize;
         long end = start + pageSize - 1;
-
-        // 2. 从 Redis ZSet 中获取按时间倒序的视频 ID 集合
-        Set<String> videoIds = stringRedisTemplate.opsForZSet().reverseRange(USER_LIKE_ZSET + userId, start, end);
-
-
-        if (CollectionUtils.isEmpty(videoIds)) {
-            return RestBean.success(null);
-        }
-        List<String> idList = new ArrayList<>(videoIds);
+//        查询用户点赞过的视频id
+        List<String> idList = likeMapper.selectByUserId(userId);
         // 4. 批量从数据库查询视频详情
         // 注意：selectBatchIds 返回的顺序不一定匹配 idList 的顺序
         List<Video> videos = videoMapper.selectVideosByIdList(idList);
