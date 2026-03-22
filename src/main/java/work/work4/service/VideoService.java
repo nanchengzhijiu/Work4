@@ -1,7 +1,4 @@
 package work.work4.service;
-
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -11,6 +8,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import work.work4.common.LoginUser;
@@ -44,6 +42,7 @@ public class VideoService implements VideoServiceInterface {
         // 加载点击率排行榜
         refreshVisitRanking();
     }
+
     @Override
     public RestBean<Object> getVideoStream(String latest_time) {
         // 1. 从 Redis 随机抽取 20 个视频 ID
@@ -62,7 +61,7 @@ public class VideoService implements VideoServiceInterface {
         }).toList();
         return RestBean.success(videoVos);
     }
-
+    @Async("videoUploadTaskExecutor")
     @Override
     public void publish(MultipartFile file,String title,String description,LoginUser loginUser) throws IOException {
 

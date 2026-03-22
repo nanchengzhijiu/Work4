@@ -26,11 +26,7 @@ public class VideoController {
     public RestBean<Object> publish(@RequestParam MultipartFile data, @RequestParam String title, @RequestParam String description) throws IOException {
         // 1. 验证登录状态
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new RuntimeException("用户未登录或认证失效");
-        }
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        System.out.println(loginUser);
         videoService.publish(data,title,description,loginUser);
         return RestBean.success();
     }
