@@ -14,9 +14,13 @@ import java.util.List;
 @Data
 public class LoginUser implements UserDetails {
     private User user;
+    private Collection<? extends GrantedAuthority> authorities;
+    public LoginUser(User user){
+        this.user=user;
+    }
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return authorities;
     }
 
     @Override

@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,6 +30,8 @@ import work.work4.pojo.User;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Collections;
+import java.util.List;
 
 @EnableWebSecurity
 @Configuration
@@ -49,10 +52,26 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
+            // 1. 从数据库查询用户
             User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
                     .eq(User::getUsername, username));
-            if (user == null) throw new UsernameNotFoundException("用户不存在");
-            return new LoginUser(user);
+
+            if (user == null) {
+                throw new UsernameNotFoundException("用户不存在");
+            }
+
+            // 2. 获取用户角色并处理前缀
+            // 假设 user.getRole() 返回 "ADMIN" 或 "USER"
+            String role = user.getRole();
+
+            // Spring Security 默认要求角色权限必须以 "ROLE_" 开头
+            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                    new SimpleGrantedAuthority("ROLE_" + role)
+            );
+
+            // 3. 返回封装后的 LoginUser
+            // 注意：你的 LoginUser 构造函数需要接收这个 authorities 列表
+            return new LoginUser(user, authorities);
         };
     }
     @Bean
@@ -62,8 +81,11 @@ public class SecurityConfig {
                 .sessionManagement(conf -> conf.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态
                 .authorizeHttpRequests(conf -> {
                     // 允许登录、注册、静态资源直接访问
-                    conf.requestMatchers("/user/login","/user/register","/video/feed", "/css/**", "/js/**").permitAll();
+                    conf.requestMatchers("/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/user/login","/user/register","/video/feed", "/css/**", "/js/**")
+                            .permitAll();
                     conf.anyRequest().authenticated();
+
                 }) 
                 .exceptionHandling(conf -> {
                     conf.accessDeniedHandler(this::handleError);

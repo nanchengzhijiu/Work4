@@ -12,6 +12,10 @@ import java.util.List;
 public class SocialController {
     @Resource
     private SocialService socialService;
+    @GetMapping("/admin/test")
+    public String test(){
+        return "管理员页面";
+    }
 //    关注
     @PostMapping("/relation/action")
     public RestBean<Object> followAction(@RequestParam("to_user_id") String toUserId,
