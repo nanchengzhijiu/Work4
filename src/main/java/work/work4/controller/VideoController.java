@@ -10,6 +10,7 @@ import work.work4.common.RestBean;
 import work.work4.service.VideoService;
 import work.work4.vo.VideoVo;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -23,11 +24,13 @@ public class VideoController {
         return videoService.getVideoStream(latest_time);
     }
     @PostMapping("/publish")
-    public RestBean<Object> publish(@RequestParam MultipartFile data, @RequestParam String title, @RequestParam String description) throws IOException {
+    public RestBean<Object> publish(@RequestParam("data") MultipartFile data, @RequestParam String title, @RequestParam String description) throws IOException {
         // 1. 验证登录状态
+        File tempFile = File.createTempFile("video_", ".tmp");
+        data.transferTo(tempFile);
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        videoService.publish(data,title,description,loginUser);
+        videoService.publish(tempFile,title,description,loginUser);
         return RestBean.success();
     }
     @GetMapping("/list")
