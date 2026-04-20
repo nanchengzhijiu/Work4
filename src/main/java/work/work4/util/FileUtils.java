@@ -2,10 +2,13 @@ package work.work4.util;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import com.aliyun.oss.model.ObjectMetadata;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -36,23 +39,36 @@ public class FileUtils {
         ossClient.shutdown();
         return url;
     }
-    public String[] uploadVideo(MultipartFile file) throws IOException {
-        String originalName = file.getOriginalFilename();
-        // 使用 UUID + 时间戳防止文件名重复
-        String fileName = "video/" + originalName;
-        String fileBaseUrl="https://"+bucketVideo+"."+endpoint+"/";
+    public String[] uploadVideo(File file) throws IOException {
+        // 1. 获取文件名（File 对象使用 getName()）
+        String originalName = file.getName();
+        // 建议：即使是 File，也建议加个 UUID 或时间戳前缀，防止 OSS 同名覆盖
+        String fileName = "video/" + System.currentTimeMillis() + "_" + originalName;
+
+        String fileBaseUrl = "https://" + bucketVideo + "." + endpoint + "/";
         OSS ossClient = getOssClient();
-        try {
-            ossClient.putObject(bucketVideo, fileName, file.getInputStream());
+
+        // 2. 使用 FileInputStream 包装 File 对象
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            // OSS 的 putObject 建议传入 ObjectMetadata 设置 Content-Type，
+            // 否则 OSS 可能会将其识别为 application/octet-stream，导致浏览器无法直接播放
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("video/mp4"); // 或者根据后缀动态判断
+            ossClient.putObject(bucketVideo, fileName, inputStream, metadata);
+        } catch (Exception e) {
+            throw new IOException("视频上传至阿里云失败", e);
         } finally {
+            // 3. 注意：如果你的 getOssClient() 每次都 new 一个新实例，则需要 shutdown
+            // 如果是单例 Bean，则千万不要在这里 shutdown，否则下次调用会报错
             ossClient.shutdown();
         }
 
-        // 视频基础地址
-        String videoUrl = fileBaseUrl+fileName;
-        // 关键点：利用 OSS 视频截帧处理参数
-        // t_0 表示第 0 毫秒（第一帧），f_jpg 表示格式
-        String coverUrl = fileBaseUrl+fileName + "?x-oss-process=video/snapshot,t_0,f_jpg,w_800,h_600,m_fast";
+        // 4. 视频基础地址
+        String videoUrl = fileBaseUrl + fileName;
+
+        // 5. 封面地址：利用 OSS 视频截帧
+        // 注意：如果你的 Bucket 是私有的，这个 URL 需要加签名才能访问，否则 403
+        String coverUrl = videoUrl + "?x-oss-process=video/snapshot,t_0,f_jpg,w_800,h_600,m_fast";
 
         return new String[]{videoUrl, coverUrl};
     }

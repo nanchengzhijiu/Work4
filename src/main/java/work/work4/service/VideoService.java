@@ -19,6 +19,8 @@ import work.work4.pojo.Video;
 import work.work4.util.CacheUtil;
 import work.work4.util.FileUtils;
 import work.work4.vo.VideoVo;
+
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +65,7 @@ public class VideoService implements VideoServiceInterface {
     }
     @Async("videoUploadTaskExecutor")
     @Override
-    public void publish(MultipartFile file,String title,String description,LoginUser loginUser) throws IOException {
+    public void publish(File file, String title, String description, LoginUser loginUser) throws IOException {
 
         // 2. 调用工具类上传到阿里云 OSS
         // 数组索引 0 是视频名，1 是带截帧参数的封面名
@@ -163,9 +165,6 @@ public class VideoService implements VideoServiceInterface {
         // 1. 拼接 Key
         String redisKey = VIDEO_CACHE_KEY + username + ":" + keywords + ":" + pageNum + ":" + pageSize;
 
-        // 2. 调用工具类（只处理缓存穿透）
-        // 注意：由于返回的是 List，List.class 在反序列化时会有泛型擦除风险
-        // 如果之后遇到类型转换问题，可以将 toBean 改为 toList
         List<VideoVo> vos = cacheUtil.queryWithPassThrough(
                 redisKey, 30L, TimeUnit.MINUTES, List.class,VideoVo.class,
                 () -> {
