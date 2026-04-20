@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="work.work4.mapper.ChatMemberMapper">
+    <insert id="saveByMemberIds">
+        insert into chat_member (id, chat_id, user_id, role, join_at)
+        values
+        <foreach collection="members" item="member" separator=",">
+            (#{member.id}, #{member.chatId}, #{member.userId}, #{member.role}, #{member.joinAt})
+        </foreach>
+    </insert>
+    <select id="selectChatByUserId" resultType="Chat">
+        select
+        c.id,
+        c.chat_name,
+        c.type,
+        c.relation_key,
+        c.created_at
+        from chat_member as cm
+        inner join chat as c on cm.chat_id = c.id
+        where cm.user_id = #{userId}
+    </select>
+    <select id="selectUserByChatId" resultType="work.work4.ws.UserInfo">
+        select
+        u.id,
+        u.username,
+        u.avatar_url,
+        cm.role,
+        cm.join_at
+        from chat_member as cm
+        inner join user as u on cm.user_id=u.id
+        where cm.chat_id=#{chatId}
+    </select>
+</mapper>

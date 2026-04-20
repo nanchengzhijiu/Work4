@@ -8,13 +8,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import work.work4.common.LoginUser;
-import work.work4.mapper.FollowMapper;
-import work.work4.mapper.FriendMapper;
-import work.work4.mapper.UserMapper;
+import work.work4.mapper.*;
 import work.work4.pojo.*;
 import work.work4.service.Interface.SocialServiceInterface;
 import work.work4.vo.FollowVo;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -129,4 +126,5 @@ public class SocialService implements SocialServiceInterface {
                 }).collect(Collectors.toList());
         return friendVos;
     }
+
 }

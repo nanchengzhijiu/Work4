@@ -13,4 +13,6 @@ public class RedisConstants {
     public static final String VIDEO_POOL_KEY = "video:global:pool";//随机池
     public static final String VIDEO_CACHE_KEY = "video:cache:";//缓存池子
     public static final String SEARCH_CACHE_KEY = "search:lock:";//缓存池子
+    public static final String CHAT_HISTORY_KEY="chat:history:";//聊天历史记录
+    public static final String BLACK_USER_KEY="user:black:";//用户拉黑名单
 }

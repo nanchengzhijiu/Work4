@@ -14,7 +14,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -82,7 +81,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(conf -> {
                     // 允许登录、注册、静态资源直接访问
                     conf.requestMatchers("/admin/**").hasRole("ADMIN")
-                            .requestMatchers("/user/login","/user/register","/video/feed", "/css/**", "/js/**")
+                            .requestMatchers("/user/login","/user/register","/video/feed", "/css/**", "/js/**","/ws")
                             .permitAll();
                     conf.anyRequest().authenticated();
 
